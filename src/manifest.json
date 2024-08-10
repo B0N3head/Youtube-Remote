@@ -1,7 +1,7 @@
 {
   "name": "YouTube Remote",
   "short_name": "YT Remote",
-  "version": "0.1.3",
+  "version": "0.2.1",
   "description": "Control Youtube from other devices on your local network",
   "permissions": [
     "scripting",

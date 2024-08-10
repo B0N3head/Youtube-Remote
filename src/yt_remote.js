@@ -2,7 +2,7 @@ const isYTMusic = window.location.hostname === 'music.youtube.com';
 const youtubeNonStop = typeof lastInteractionTime !== 'undefined';
 const ytr_debug = true;
 
-let nextButton, prevButton, pauseButton, volumeSlider, lastMetaData;
+let nextButton, prevButton, pauseButton, volumeSlider, lastMetaData, lastPause;
 
 function ytrlog(message) {
     console.log(`[Youtube Remote] ${message}`);
@@ -91,7 +91,7 @@ function initPeerJS() {
     const peerId = document.getElementsByClassName('ytRemoteScript')[0].id;
     peer = new Peer(peerId);
 
-    peer.on('open', function (id) {
+    peer.on('open', (id) => {
         // Workaround for peer.reconnect deleting previous id
         if (!peer.id) {
             ytrlog('Received null id from peer open');
@@ -119,7 +119,7 @@ function initPeerJS() {
         // Reset metadata incase it has already been collected
         lastMetaData = null;
 
-        conn.on('data', function (data) {
+        conn.on('data', (data) => {
             try {
                 if (ytr_debug)
                     ytrlog(`Raw data received: "${data}"`);
@@ -147,29 +147,29 @@ function initPeerJS() {
             }
         });
 
-        conn.on('close', function () {
+        conn.on('close', () => {
             ytrlog('Connection reset');
             conn = null;
         });
     });
 
-    peer.on('disconnected', function () {
+    peer.on('disconnected', () => {
         ytrlog('Connection lost. Please reconnect');
         peer.id = lastPeerId;
         peer._lastServerId = lastPeerId;
         peer.reconnect();
     });
 
-    peer.on('close', function () {
+    peer.on('close', () => {
         conn = null;
         ytrlog('Connection destroyed');
     });
 
-    peer.on('error', function (err) {
+    peer.on('error', (err) => {
         ytrlog(err);
         // Attempt to close connection
-        //conn.close();
-        //conn = null;
+        conn.close();
+        conn = null;
     });
 
     return true;
@@ -190,21 +190,52 @@ const imageToBase64 = (url, callback) => {
 // Options.js cannot load from external resources so we'll just encode the image and send it to the client
 const sendCurrentMediaData = (metaData) => {
     ytrlog("Metadata difference found, sending data");
-    imageToBase64(metaData.artwork[0].src, (base64Image) => {
+    imageToBase64(goodQuality(metaData.artwork), (base64Image) => {
         if (conn && conn.open) {
-            conn.send(JSON.stringify({ title: metaData.title, artist: metaData.artist, artwork: base64Image }));
+            conn.send(JSON.stringify({ type: "meta", title: metaData.title, artist: metaData.artist, artwork: base64Image }));
         } else {
             ytrlog('Failed to send currently playing info');
         }
     });
 }
 
+// We don't care about the highest quality, at least 256x256
+const goodQuality = (artworkList) => {
+    if (artworkList.length === 1)
+        return artworkList[0].src;
+
+    let best = null;
+    let top = 0;
+    artworkList.forEach(obj => {
+        if (best == null) {
+            best = obj;
+        } else {
+            let single = Number(obj.sizes.split("x")[0]);
+            if (single > top && top < 250 && single < 420) {
+                best = obj; top = single;
+            }
+        }
+    });
+
+    return best.src;
+}
+
+const sendCurrentPauseData = (isPlaying) => {
+    conn.send(JSON.stringify({ type: "playing", value: isPlaying }));
+}
+
+// Check every 2 sec for any changes in the media metadata
 const interval = setInterval(function () {
+    let pauseFound = (navigator.mediaSession.playbackState == "playing")
+    if (pauseFound != lastPause && lastPause != null)
+        sendCurrentPauseData(pauseFound)
+    lastPause = pauseFound;
+
     let metaDataFound = navigator.mediaSession.metadata;
     if (metaDataFound != lastMetaData && metaDataFound != null)
         sendCurrentMediaData(metaDataFound)
     lastMetaData = metaDataFound;
-}, 2500);
+}, 2000);
 
 // peerjs.min.js
 (() => {

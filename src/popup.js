@@ -1,4 +1,9 @@
+console.log(`[Youtube Remote v${chrome.runtime.getManifest().version}]`);
+
 document.addEventListener('DOMContentLoaded', () => {
+
+  document.getElementById("version").innerHTML = `v${chrome.runtime.getManifest().version}`;
+
   chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
     let found = false;
     if (tabs.length >= 1) {
@@ -23,7 +28,7 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     }
 
-    if(!found)
+    if (!found)
       document.getElementById('id').textContent = 'Site not supported';
   });
 

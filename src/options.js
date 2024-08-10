@@ -1,149 +1,199 @@
+console.log(`[Youtube Remote v${chrome.runtime.getManifest().version}]`);
+
+let ytrDebug = false;
+
 let lastPeerId = null;
 let peer = null;
 let conn = null;
 
 let htmlStatusElement = null;
+let idInputElement = null;
+
 let htmlTitle = null;
 let htmlArtist = null;
 let htmlArtwork = null;
 
-function ytrlog(message) {
+let pauseButton = null;
+let volumeSlider = null;
+
+const ytrlog = (message) => {
   console.log(`[Youtube Remote] ${message}`);
 }
 
-function sendData(data) {
+const ytrdbg = (message) => {
+  if (ytrDebug)
+    console.warn(`[Youtube Remote] ${message}`);
+}
+
+const sendData = (data) => {
   if (conn && conn.open) {
     conn.send(data);
-    console.log(data);
+    ytrdbg(data);
   } else {
-    console.log('Connection is closed');
+    ytrdbg('Connection is closed');
   }
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-  htmlStatusElement = document.getElementById("status");
+  // -------- Init --------
 
-  htmlTitle = document.getElementById("title");
-  htmlArtist = document.getElementById("artist");
-  htmlArtwork = document.getElementById("artwork");
+  idInputElement = document.getElementById('recID');
+  htmlStatusElement = document.getElementById('status');
+
+  htmlTitle = document.getElementById('title');
+  htmlArtist = document.getElementById('artist');
+  htmlArtwork = document.getElementById('artwork');
+
+  pauseButton = document.getElementById('pauseButton');
+  volumeSlider = document.getElementById('volumeSlide');
+
+  idInputElement.disabled = true;
+  idInputElement.value = "plz wait, still loading...";
+
+  // -------- PeerJS --------
 
   peer = new Peer();
-  peer.on('open', function (id) {
-    // Workaround for peer.reconnect deleting previous id
+  // Create our peerJS client
+  peer.on('open', (id) => {
     if (peer.id === null) {
-      console.log('Received null id from peer open');
+      ytrlog('Received null id from peer open');
       peer.id = lastPeerId;
     } else {
       lastPeerId = peer.id;
     }
-    console.log('ID: ' + peer.id);
-    htmlStatusElement.innerHTML = "Ready to go";
+    ytrlog('ID: ' + peer.id);
+
+    // Let the user know we are ready
+    htmlStatusElement.innerHTML = 'Ready';
+    idInputElement.disabled = false;
+    idInputElement.value = "";
+    document.getElementById('connectText').className = "text-slate-100  group-hover:text-white transition";
   });
 
   // Disallow incoming connections
-  peer.on('connection', function (c) {
-    c.on('open', function () {
-      console.log('Sender does not accept incoming connections');
-      setTimeout(function () { c.close(); }, 500);
+  peer.on('connection', (c) => {
+    c.on('open', () => {
+      ytrdbg('Attempted connection to client closed');
+      setTimeout(() => { c.close(); }, 250);
     });
   });
 
-  peer.on('disconnected', function () {
-    htmlStatusElement.innerHTML = "Connection lost. Attempting reconnection";
-    console.log('Connection lost. Attempting reconnection');
-
-    // Workaround for peer.reconnect deleting previous id
+  // Attempt to reconnect if we loose connection
+  peer.on('disconnected', () => {
+    htmlStatusElement.innerHTML = 'Connection lost. Attempting reconnection';
+    ytrdbg('Connection lost. Attempting reconnection');
     peer.id = lastPeerId;
     peer._lastServerId = lastPeerId;
     peer.reconnect();
   });
 
+  // If something happens to us (loss of internet possibly) then ask for a refresh
   peer.on('close', function () {
     conn = null;
-    htmlStatusElement.innerHTML = "Connection destroyed. Please refresh";
-    console.log('Connection destroyed');
+    htmlStatusElement.innerHTML = 'Whoops, something went wrong. Plz refresh the page';
   });
 
+  // Log all errors (to debug) but show the ones that revolve around crappy user input
   peer.on('error', function (err) {
-    console.log(err);
+    if (err.message.startsWith('Could not connect'))
+      htmlStatusElement.innerHTML = err.message.replace('peer', 'client');
+    ytrdbg(err.message);
   });
 
   document.getElementById('connectButton').addEventListener('click', () => {
+    // Disconnect any old connections
     if (conn) {
-      htmlStatusElement.innerHTML = "Disconnected...";
+      htmlStatusElement.innerHTML = 'Disconnecting...';
       conn.close();
+      conn = null;
     }
 
-    conn = peer.connect(document.getElementById('recID').value.toLowerCase(), {
+    // Tell the user we are doing something
+    htmlStatusElement.innerHTML = 'Attempting to connect...';
+
+    // Attempt to connect
+    conn = peer.connect(idInputElement.value.toLowerCase(), {
       reliable: true
     });
 
-    conn.on('open', function () {
-      htmlStatusElement.innerHTML = "Connected to: " + conn.peer;
-      console.log("Connected to: " + conn.peer);
+    // Lets tell the user we connected successfully 
+    conn.on('open', () => {
+      htmlStatusElement.innerHTML = 'Connected to: ' + conn.peer;
+      ytrlog('Connected to: ' + conn.peer);
     });
 
     // Handle incoming data (messages only since this is the signal sender)
-    conn.on('data', function (data) {
+    conn.on('data', (data) => {
       try {
         const message = JSON.parse(data);
-        console.log(message);
-        htmlTitle.innerHTML = message.title;
-        htmlArtist.innerHTML = message.artist;
-
-        if (message.artwork != null)
-          htmlArtwork.src = message.artwork;
-        
+        switch (message.type) {
+          case 'meta': // Metadata from song change
+            htmlTitle.innerHTML = message.title;
+            htmlArtist.innerHTML = message.artist;
+            if (message.artwork != null)
+              htmlArtwork.src = message.artwork;
+            break;
+          case 'playing': // If the server has messed with the player state, then we send updates to the client in an attempt to keep them synced
+            pauseButton.dataset.state = message.value ? 'playing' : 'paused';
+            updateButtonUI();
+            break;
+          default:
+            ytrdbg(`Unknown data ${error}`);
+        }
       } catch (error) {
-        ytrlog(`Error handling data: ${error}`);
+        ytrdbg(`Error parsing data: ${error}`);
       }
     });
 
-    conn.on('close', function () {
-      htmlStatusElement.innerHTML = "Connection closed";
+    conn.on('close', () => {
+      htmlStatusElement.innerHTML = 'Connection closed';
+      setTimeout(() => { htmlStatusElement.innerHTML = 'Ready'; }, 500);
     });
   });
 
-  document.getElementById("prevButton").addEventListener('click', function () {
+  // -------- Event Listeners --------
+  document.getElementById('prevButton').addEventListener('click', () => {
     sendData(JSON.stringify({ type: 'prev' }));
   });
-  document.getElementById("pauseButton").addEventListener('click', function () {
+
+  document.getElementById('pauseButton').addEventListener('click', () => {
     sendData(JSON.stringify({ type: 'pause' }));
   });
-  document.getElementById("nextButton").addEventListener('click', function () {
+
+  document.getElementById('nextButton').addEventListener('click', () => {
     sendData(JSON.stringify({ type: 'next' }));
   });
 
-  document.getElementById("volumeSlide").addEventListener("mouseup", () => {
-    let sliderVal = document.getElementById("volNumb");
-    sliderVal.innerHTML = document.getElementById("volumeSlide").value;
-    sendData(JSON.stringify({ type: 'vol', vol: sliderVal.innerHTML }));
+  volumeSlider.addEventListener('mouseup', () => {
+    sendData(JSON.stringify({ type: 'vol', vol: volumeSlider.value }));
   });
 
-  const pauseButton = document.getElementById("pauseButton");
+  pauseButton.addEventListener('click', () => {
+    // Ping pong the play/pause stated
+    pauseButton.dataset.state = (pauseButton.dataset.state === 'playing') ? 'paused' : 'playing';
+    updateButtonUI()
+  });
 
-  pauseButton.addEventListener("click", () => {
-      // Check the current state using a data attribute
-      if (pauseButton.dataset.state === "playing") {
-          // Set the button to paused state with the pause icon
-          pauseButton.innerHTML = `
+  // -------- Misc --------
+  const updateButtonUI = () => {
+    if (pauseButton.dataset.state === 'playing') {
+      // Pause SVG icon
+      pauseButton.innerHTML = `
           <div class="flex justify-center items-center">
-              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="3" stroke="currentColor" class="size-8 stroke-white stroke-white/50 group-hover:stroke-white/20 transition">
+              <svg fill="none" viewBox="0 0 24 24" stroke-width="3" stroke="currentColor" class="size-8 stroke-white stroke-white/50 group-hover:stroke-white/20 transition">
               <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 5.25v13.5m-7.5-13.5v13.5" />
               </svg>
           </div>`;
-          pauseButton.dataset.state = "paused";
-      } else {
-          // Set the button to playing state with the play icon
-          pauseButton.innerHTML = `
+    } else {
+      // Play SVG icon
+      pauseButton.innerHTML = `
           <div class="flex justify-center items-center">
-              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-8 stroke-white/20 group-hover:stroke-white/50 transition"> 
+              <svg fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-8 stroke-white/20 group-hover:stroke-white/50 transition"> 
               <path stroke-linecap="round" stroke-linejoin="round" d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.347a1.125 1.125 0 0 1 0 1.972l-11.54 6.347a1.125 1.125 0 0 1-1.667-.986V5.653Z" />
               </svg>
           </div>`;
-          pauseButton.dataset.state = "playing";
-      }
-  });
+    }
+  }
 });
 
 // peerjs.min.js
