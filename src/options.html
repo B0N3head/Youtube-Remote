@@ -19,7 +19,7 @@
 <body>
     <div class="text-slate-100">
         <div class="bg-[#1e1e1f] text-slate-100 p-8 rounded-t-[25px] shadow-lg w-110"
-            style="background-size: 100% 100%;background-position: 0px 0px,0px 0px,0px 0px;background-image: radial-gradient(45% 50% at 99% 1%, #FFDA1A08 13%, #F000 99%);">
+            style="background-size: 100% 100%;background-position: 0px 0px,0px 0px,0px 0px;background-image: radial-gradient(45% 50% at 99% 1%, #ffffff08 13%, #F000 99%);">
             <div class="flex space-x-2 w-full text-nowrap mb-2 text-white">
                 <h1 class="text-3xl font-bold mb-1 text-slate-100">YouTube Remote</h1>
                 <b id="version" class="text-xs text-slate-100/10 font">v0.1.3</b>
@@ -27,7 +27,9 @@
             <p class="mb-4 text-slate-100/20">Control Youtube players on the same network</p>
             <div class="mb-2 flex items-center group">
                 <div for="recID"
-                    class="h-[42px] mr-2 bg-[#18181B]/50 backdrop-blur-lg text-slate-100/30 py-2 px-4 rounded-md border border-white/10 transition"><p class="group-hover:text-white font-medium transition text-slate-100/40 text-base/6">ID:</p></div>
+                    class="h-[42px] mr-2 bg-[#18181B]/50 backdrop-blur-lg text-slate-100/30 py-2 px-4 rounded-md border border-white/10 transition">
+                    <p class="group-hover:text-white font-medium transition text-slate-100/40 text-base/6">ID:</p>
+                </div>
                 <input type="text" id="recID" title="YouTube Remote ID"
                     class="h-[42px] text-slate-100 text-base/6 placeholder:text-zinc-500 font-medium p-2 w-full rounded-md border border-white/10 text-slate-100 shadow-sm hover:ring-1 hover:ring-white/10 focus:ring-1 focus:ring-white/10 transition appearance-none rounded-lg focus:outline-none bg-[#18181B]/50 backdrop-blur-lg">
             </div>
@@ -47,13 +49,15 @@
             </button>
         </div>
         <div class="bg-[#1e1e1f] text-slate-100 p-8 rounded-b-[25px] shadow-lg w-110 mt-2"
-            style="background-size: 100% 100%;background-position: 0px 0px,0px 0px,0px 0px;background-image: radial-gradient(33% 43% at 5% 93%, #FFD60008 7%, #073AFF00 100%);">
+            style="background-size: 100% 100%;background-position: 0px 0px,0px 0px,0px 0px;background-image: radial-gradient(33% 43% at 5% 93%, #ffffff08 7%, #073AFF00 100%);">
             <div class="container mb-4 bg-[#141415] rounded-md border border-white/10" style="height: 200px;">
-                <img id="artwork" style="height: 100%;object-fit: contain;display: block;margin-left: auto;margin-right: auto;" src="" >
+                <img id="artwork"
+                    style="height: 100%;object-fit: contain;display: block;margin-left: auto;margin-right: auto;"
+                    src="">
             </div>
 
             <div style="width: 400px;">
-                <p id="title" style="font-size: large;width: fit-content;">Nothing</p>  
+                <p id="title" style="font-size: large;width: fit-content;">Nothing</p>
                 <p id="artist" class="mb-4 text-slate-100/40">The silence is deafening</p>
             </div>
 
@@ -72,7 +76,6 @@
             </div>
 
             <div class="flex justify-between space-x-2">
-
                 <button type="button" id="prevButton"
                     class="group text-slate-100 py-2 px-4 rounded flex-1 bg-[#18181B]/50 backdrop-blur-lg font-bold border border-white/10 text-slate-100 shadow-sm hover:ring-1 hover:ring-white/10 transition">
                     <div class="flex justify-center items-center">
@@ -107,6 +110,94 @@
             <p id="status" class="text-center font-bold text-slate-100/20 mt-2 select-none">Plz wait</p>
         </div>
     </div>
+
+    <div style="display: none;" id="mainCredits">
+        <div id="select-modal" tabindex="-1" class="fixed md:inset-0" style="background-color: #0b0b0bb8;">
+            <div class="relative p-4 "
+                style="width: 400px;align-content: center;display: block;top: 50%;left: 50%;margin-left: -200px;margin-top: -300px;height: 495px;">
+                <div class="bg-[#1e1e1f] text-slate-100 p-2 rounded-t-[25px] shadow-lg">
+                    <div class="flex items-center justify-between p-4 md:p-5 border-b rounded-t">
+                        <h3 class="text-lg font-semibold text-white">
+                            Credits
+                        </h3>
+                        <button id="closeCredits" type="button"
+                            class="text-gray-400 bg-transparent hover:bg-gray-200 hover:text-gray-900 rounded-lg text-sm h-8 w-8 ms-auto inline-flex justify-center items-center">
+                            <svg class="w-3 h-3" aria-hidden="true" fill="none" viewBox="0 0 14 14">
+                                <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"
+                                    stroke-width="2" d="m1 1 6 6m0 0 6 6M7 7l6-6M7 7l-6 6"></path>
+                            </svg>
+                        </button>
+                    </div>
+                    <div class="p-4 md:p-5">
+                        <p class="text-gray-500 mb-4">People:</p>
+                        <ul class="space-y-4 mb-4 text-slate-100/80">
+                            <li id="bCredits">
+                                <label
+                                    class="inline-flex items-center justify-between w-full p-5 hover:text-white transition bg-[#18181B]/50 border border-gray-200 rounded-lg cursor-pointer">
+                                    <div class="block">
+                                        <div class="w-full text-lg font-semibold">Bonehead</div>
+                                        <div class="w-full text-gray-500">Programming</div>
+                                    </div>
+                                    <svg class="w-4 h-4 ms-3 rtl:rotate-180 text-gray-500" aria-hidden="true"
+                                        fill="none" viewBox="0 0 14 10">
+                                        <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"
+                                            stroke-width="2" d="M1 5h12m0 0L9 1m4 4L9 9"></path>
+                                    </svg>
+                                </label>
+                            </li>
+                            <li id="iCredits">
+                                <label
+                                    class="inline-flex items-center justify-between w-full p-5 hover:text-white transition bg-[#18181B]/50 hover:bg-[#141415] border border-gray-200 rounded-lg cursor-pointer">
+                                    <div class="block">
+                                        <div class="w-full text-lg font-semibold">Infinitumio</div>
+                                        <div class="w-full text-gray-500">UI/UX</div>
+                                    </div>
+                                    <svg class="w-4 h-4 ms-3 rtl:rotate-180 text-gray-500" aria-hidden="true"
+                                        fill="none" viewBox="0 0 14 10">
+                                        <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"
+                                            stroke-width="2" d="M1 5h12m0 0L9 1m4 4L9 9"></path>
+                                    </svg>
+                                </label>
+                            </li>
+                            <p class="text-gray-500 mb-4">Libraries:</p>
+                            <div class="inline-flex">
+                                <li id="pCredits">
+                                    <label
+                                        class="inline-flex items-center justify-between p-5 hover:text-white transition bg-[#18181B]/50 hover:bg-[#141415] border border-gray-200 rounded-lg cursor-pointer">
+                                        <div class="block">
+                                            <div class="w-full font-semibold">PeerJS</div>
+                                        </div>
+                                        <svg class="w-4 h-4 ms-3 rtl:rotate-180 text-gray-500" aria-hidden="true"
+                                            fill="none" viewBox="0 0 14 10">
+                                            <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"
+                                                stroke-width="2" d="M1 5h12m0 0L9 1m4 4L9 9"></path>
+                                        </svg>
+                                    </label>
+                                </li>
+                                <li style="padding-left: 10px;" id="tCredits">
+                                    <label
+                                        class="inline-flex items-center justify-between p-5 hover:text-white transition bg-[#18181B]/50 hover:bg-[#141415] border border-gray-200 rounded-lg cursor-pointer">
+                                        <div class="block">
+                                            <div class="w-full font-semibold">TailwindCSS</div>
+                                        </div>
+                                        <svg class="w-4 h-4 ms-3 rtl:rotate-180 text-gray-500" aria-hidden="true"
+                                            fill="none" viewBox="0 0 14 10">
+                                            <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"
+                                                stroke-width="2" d="M1 5h12m0 0L9 1m4 4L9 9"></path>
+                                        </svg>
+                                    </label>
+                                </li>
+                            </div>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <b id="creditsShow" style="position: fixed;right: 8px;bottom: 8px;"
+        class="text-xs text-slate-100/40 font cursor-pointer">Credits</b>
+
     <script src="options.js"></script>
 </body>
 

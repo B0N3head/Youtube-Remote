@@ -3,6 +3,7 @@ console.log(`[Youtube Remote v${chrome.runtime.getManifest().version}]`);
 document.addEventListener('DOMContentLoaded', () => {
 
   document.getElementById("version").innerHTML = `v${chrome.runtime.getManifest().version}`;
+  document.title =`YouTube Remote v${chrome.runtime.getManifest().version}`;
 
   chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
     let found = false;

@@ -8,6 +8,7 @@ let conn = null;
 
 let htmlStatusElement = null;
 let idInputElement = null;
+let creditsElement = null;
 
 let htmlTitle = null;
 let htmlArtist = null;
@@ -15,6 +16,9 @@ let htmlArtwork = null;
 
 let pauseButton = null;
 let volumeSlider = null;
+
+let currentUNIX = 0;
+
 
 const ytrlog = (message) => {
   console.log(`[Youtube Remote] ${message}`);
@@ -39,6 +43,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   idInputElement = document.getElementById('recID');
   htmlStatusElement = document.getElementById('status');
+  creditsElement = document.getElementById('mainCredits');
 
   htmlTitle = document.getElementById('title');
   htmlArtist = document.getElementById('artist');
@@ -48,7 +53,6 @@ document.addEventListener('DOMContentLoaded', () => {
   volumeSlider = document.getElementById('volumeSlide');
 
   idInputElement.disabled = true;
-  idInputElement.value = "plz wait, still loading...";
 
   // -------- PeerJS --------
 
@@ -66,7 +70,6 @@ document.addEventListener('DOMContentLoaded', () => {
     // Let the user know we are ready
     htmlStatusElement.innerHTML = 'Ready';
     idInputElement.disabled = false;
-    idInputElement.value = "";
     document.getElementById('connectText').className = "text-slate-100  group-hover:text-white transition";
   });
 
@@ -78,7 +81,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 
-  // Attempt to reconnect if we loose connection
+  // Attempt to reconnect if we lose connection
   peer.on('disconnected', () => {
     htmlStatusElement.innerHTML = 'Connection lost. Attempting reconnection';
     ytrdbg('Connection lost. Attempting reconnection');
@@ -87,10 +90,10 @@ document.addEventListener('DOMContentLoaded', () => {
     peer.reconnect();
   });
 
-  // If something happens to us (loss of internet possibly) then ask for a refresh
+  // Usually only fires if the peer has a serious issue, just ask for a refresh
   peer.on('close', function () {
     conn = null;
-    htmlStatusElement.innerHTML = 'Whoops, something went wrong. Plz refresh the page';
+    htmlStatusElement.innerHTML = 'Something went wrong. Plz refresh the page';
   });
 
   // Log all errors (to debug) but show the ones that revolve around crappy user input
@@ -125,18 +128,33 @@ document.addEventListener('DOMContentLoaded', () => {
     // Handle incoming data (messages only since this is the signal sender)
     conn.on('data', (data) => {
       try {
-        const message = JSON.parse(data);
-        switch (message.type) {
+        // Used for checking client pulse (no pong as the ping would error + we don't care about latency)
+        if (data === "ping")
+          return;
+
+        const connDataJson = JSON.parse(data);
+        switch (connDataJson.type) {
           case 'meta': // Metadata from song change
-            htmlTitle.innerHTML = message.title;
-            htmlArtist.innerHTML = message.artist;
-            if (message.artwork != null)
-              htmlArtwork.src = message.artwork;
+            if (connDataJson.time < currentUNIX) // Is this data old???
+              return;
+
+            // Update media metadata
+            currentUNIX = connDataJson.time;
+            htmlTitle.innerHTML = connDataJson.title;
+            htmlArtist.innerHTML = connDataJson.artist;
+            if (connDataJson.artwork != null)
+              htmlArtwork.src = connDataJson.artwork;
             break;
+
           case 'playing': // If the server has messed with the player state, then we send updates to the client in an attempt to keep them synced
-            pauseButton.dataset.state = message.value ? 'playing' : 'paused';
+            pauseButton.dataset.state = connDataJson.value ? 'playing' : 'paused';
             updateButtonUI();
             break;
+
+          case 'error':
+            htmlStatusElement.innerHTML = 'Someone else is already connected :(';
+            break;
+
           default:
             ytrdbg(`Unknown data ${error}`);
         }
@@ -165,7 +183,34 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   volumeSlider.addEventListener('mouseup', () => {
-    sendData(JSON.stringify({ type: 'vol', vol: volumeSlider.value }));
+    // Logarithmic volume slider
+    if (volumeSlider.value != 0)
+      sendData(JSON.stringify({ type: 'vol', vol: Math.pow(10., 0.025 * (volumeSlider.value - 100)) }));
+    else
+      sendData(JSON.stringify({ type: 'vol', vol: volumeSlider.value }));
+  });
+
+  document.getElementById('closeCredits').addEventListener('click', () => {
+    toggleCredits();
+  });
+  document.getElementById('creditsShow').addEventListener('click', () => {
+    toggleCredits();
+  });
+
+  document.getElementById('bCredits').addEventListener('click', () => {
+    window.location.href = "https://github.com/B0N3head";
+  });
+
+  document.getElementById('iCredits').addEventListener('click', () => {
+    window.location.href = "https://github.com/infinitumio";
+  });
+
+  document.getElementById('pCredits').addEventListener('click', () => {
+    window.location.href = "https://peerjs.com/";
+  });
+
+  document.getElementById('tCredits').addEventListener('click', () => {
+    window.location.href = "https://tailwindcss.com/";
   });
 
   pauseButton.addEventListener('click', () => {
@@ -175,6 +220,16 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   // -------- Misc --------
+
+  document.getElementById("version").innerHTML = `v${chrome.runtime.getManifest().version}`;
+  document.title = `YouTube Remote v${chrome.runtime.getManifest().version}`;
+  const toggleCredits = () => {
+    if (creditsElement.style.display === "block")
+      creditsElement.style.display = "none";
+    else
+      creditsElement.style.display = "block";
+  }
+
   const updateButtonUI = () => {
     if (pauseButton.dataset.state === 'playing') {
       // Pause SVG icon
