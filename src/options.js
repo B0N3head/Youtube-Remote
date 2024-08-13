@@ -19,24 +19,10 @@ let volumeSlider = null;
 
 let currentUNIX = 0;
 
+const ytrlog = (message) => console.log(`[Youtube Remote] ${message}`);
+const ytrdbg = (message) => ytrDebug && console.warn(`[Youtube Remote] ${message}`);
 
-const ytrlog = (message) => {
-  console.log(`[Youtube Remote] ${message}`);
-}
-
-const ytrdbg = (message) => {
-  if (ytrDebug)
-    console.warn(`[Youtube Remote] ${message}`);
-}
-
-const sendData = (data) => {
-  if (conn && conn.open) {
-    conn.send(data);
-    ytrdbg(data);
-  } else {
-    ytrdbg('Connection is closed');
-  }
-}
+const sendData = (data) => conn && conn.open ? (conn.send(data), ytrdbg(data)) : ytrdbg('Connection is closed');
 
 document.addEventListener('DOMContentLoaded', () => {
   // -------- Init --------
@@ -59,12 +45,8 @@ document.addEventListener('DOMContentLoaded', () => {
   peer = new Peer();
   // Create our peerJS client
   peer.on('open', (id) => {
-    if (peer.id === null) {
-      ytrlog('Received null id from peer open');
-      peer.id = lastPeerId;
-    } else {
-      lastPeerId = peer.id;
-    }
+    peer.id = peer.id || lastPeerId;
+    lastPeerId = peer.id;
     ytrlog('ID: ' + peer.id);
 
     // Let the user know we are ready
@@ -115,9 +97,7 @@ document.addEventListener('DOMContentLoaded', () => {
     htmlStatusElement.innerHTML = 'Attempting to connect...';
 
     // Attempt to connect
-    conn = peer.connect(idInputElement.value.toLowerCase(), {
-      reliable: true
-    });
+    conn = peer.connect(idInputElement.value.toLowerCase(), { reliable: true });
 
     // Lets tell the user we connected successfully 
     conn.on('open', () => {
@@ -170,61 +150,31 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   // -------- Event Listeners --------
-  document.getElementById('prevButton').addEventListener('click', () => {
-    sendData(JSON.stringify({ type: 'prev' }));
-  });
-
-  document.getElementById('pauseButton').addEventListener('click', () => {
-    sendData(JSON.stringify({ type: 'pause' }));
-  });
-
-  document.getElementById('nextButton').addEventListener('click', () => {
-    sendData(JSON.stringify({ type: 'next' }));
-  });
+  document.getElementById('prevButton').addEventListener('click', () => sendData(JSON.stringify({ type: 'prev' })));
+  document.getElementById('pauseButton').addEventListener('click', () => sendData(JSON.stringify({ type: 'pause' })));
+  document.getElementById('nextButton').addEventListener('click', () => sendData(JSON.stringify({ type: 'next' })));
 
   volumeSlider.addEventListener('mouseup', () => {
     // Logarithmic volume slider
-    if (volumeSlider.value != 0)
-      sendData(JSON.stringify({ type: 'vol', vol: Math.pow(10., 0.025 * (volumeSlider.value - 100)) }));
-    else
-      sendData(JSON.stringify({ type: 'vol', vol: volumeSlider.value }));
+    const volume = volumeSlider.value != 0 ? Math.pow(10., 0.025 * (volumeSlider.value - 100)) : volumeSlider.value;
+    sendData(JSON.stringify({ type: 'vol', vol: volume }));
   });
 
-  document.getElementById('closeCredits').addEventListener('click', () => {
-    toggleCredits();
-  });
-  document.getElementById('creditsShow').addEventListener('click', () => {
-    toggleCredits();
-  });
+  document.getElementById('closeCredits').addEventListener('click', toggleCredits);
+  document.getElementById('creditsShow').addEventListener('click', toggleCredits);
 
-  // Links that open on separate tab from credits
+  const links = {
+    'boneCredit': "https://github.com/B0N3head",
+    'infinCredit': "https://github.com/infinitumio",
+    'peerCredit': "https://peerjs.com/",
+    'tailCredit': "https://tailwindcss.com/",
+    'hCredits': "https://developer.mozilla.org/en-US/docs/Web/HTML",
+    'cCredits': "https://developer.mozilla.org/en-US/docs/Web/CSS",
+    'jCredits': "https://developer.mozilla.org/en-US/docs/Web/JavaScript"
+  };
 
-  document.getElementById('bCredits').addEventListener('click', () => {
-    window.open("https://github.com/B0N3head", '_blank');
-  });
-
-  document.getElementById('iCredits').addEventListener('click', () => {
-    window.open("https://github.com/infinitumio", '_blank');
-  });
-
-  document.getElementById('pCredits').addEventListener('click', () => {
-    window.open("https://peerjs.com/", '_blank');
-  });
-
-  document.getElementById('tCredits').addEventListener('click', () => {
-    window.open("https://tailwindcss.com/", '_blank');
-  });
-
-  document.getElementById('hCredits').addEventListener('click', () => {
-    window.open("https://developer.mozilla.org/en-US/docs/Web/HTML", '_blank');
-  });
-
-  document.getElementById('cCredits').addEventListener('click', () => {
-    window.open("https://developer.mozilla.org/en-US/docs/Web/CSS", '_blank');
-  });
-
-  document.getElementById('jCredits').addEventListener('click', () => {
-    window.open("https://developer.mozilla.org/en-US/docs/Web/JavaScript", '_blank');
+  Object.keys(links).forEach(id => {
+    document.getElementById(id).addEventListener('click', () => window.open(links[id], '_blank'));
   });
 
   pauseButton.addEventListener('click', () => {
@@ -235,8 +185,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // -------- Misc --------
 
+  // Change all references to the version to load from the manifest file
   document.getElementById("version").innerHTML = `v${chrome.runtime.getManifest().version}`;
   document.title = `YouTube Remote v${chrome.runtime.getManifest().version}`;
+
   const toggleCredits = () => {
     if (creditsElement.style.display === "block")
       creditsElement.style.display = "none";
@@ -245,23 +197,17 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   const updateButtonUI = () => {
-    if (pauseButton.dataset.state === 'playing') {
-      // Pause SVG icon
-      pauseButton.innerHTML = `
-          <div class="flex justify-center items-center">
-              <svg fill="none" viewBox="0 0 24 24" stroke-width="3" stroke="currentColor" class="size-8 stroke-white stroke-white/50 group-hover:stroke-white/20 transition">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 5.25v13.5m-7.5-13.5v13.5" />
-              </svg>
-          </div>`;
-    } else {
-      // Play SVG icon
-      pauseButton.innerHTML = `
-          <div class="flex justify-center items-center">
-              <svg fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-8 stroke-white/20 group-hover:stroke-white/50 transition"> 
-              <path stroke-linecap="round" stroke-linejoin="round" d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.347a1.125 1.125 0 0 1 0 1.972l-11.54 6.347a1.125 1.125 0 0 1-1.667-.986V5.653Z" />
-              </svg>
-          </div>`;
-    }
+    pauseButton.innerHTML = pauseButton.dataset.state === 'playing'
+      ? `<div class="flex justify-center items-center">
+          <svg fill="none" viewBox="0 0 24 24" stroke-width="3" stroke="currentColor" class="size-8 stroke-white stroke-white/50 group-hover:stroke-white/20 transition">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 5.25v13.5m-7.5-13.5v13.5" />
+          </svg>
+         </div>`
+      : `<div class="flex justify-center items-center">
+          <svg fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-8 stroke-white/20 group-hover:stroke-white/50 transition">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.347a1.125 1.125 0 0 1 0 1.972l-11.54 6.347a1.125 1.125 0 0 1-1.667-.986V5.653Z" />
+          </svg>
+         </div>`;
   }
 });
 

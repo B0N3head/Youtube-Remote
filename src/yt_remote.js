@@ -4,9 +4,8 @@ const ytr_debug = true;
 
 let nextButton, prevButton, pauseButton, volumeSlider, lastMetaData, lastPause;
 
-function ytrlog(message) {
-    console.log(`[Youtube Remote] ${message}`);
-}
+const ytrlog = (message) => console.log(`[Youtube Remote] ${message}`);
+
 
 // ---------- Element_Hunt ---------- 
 
@@ -15,11 +14,10 @@ function element_search(id, name) {
         ytrlog(`Looking for ${id}`);
 
     let elements = document.getElementsByClassName(id);
-    if (elements.length > 0) {
+    if (elements.length > 0 && name.includes(elements[0].title)) {
         if (ytr_debug)
-            ytrlog(`Found ${id} - confirming with ${name}`);
-        if (name.includes(elements[0].title))
-            return elements[0];
+            ytrlog(`Found ${id}`);
+        return elements[0];
     }
 }
 
@@ -92,13 +90,8 @@ function initPeerJS() {
     peer = new Peer(peerId);
 
     peer.on('open', (id) => {
-        // Workaround for peer.reconnect deleting previous id
-        if (!peer.id) {
-            ytrlog('Received null id from peer open');
-            peer.id = lastPeerId;
-        } else {
-            lastPeerId = peer.id;
-        }
+        peer.id = peer.id || lastPeerId;
+        lastPeerId = peer.id;
 
         if (ytr_debug)
             ytrlog(`Peer ID: ${peer.id}`);
@@ -118,7 +111,6 @@ function initPeerJS() {
             if (conn)
                 createNewConnection = true;
 
-            // We don't w
             if (!createNewConnection) {
                 c.on('open', function () {
                     c.send("Already connected to another client");

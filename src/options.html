@@ -22,9 +22,9 @@
             style="background-size: 100% 100%;background-position: 0px 0px,0px 0px,0px 0px;background-image: radial-gradient(45% 50% at 99% 1%, #ffffff08 13%, #F000 99%);">
             <div class="flex space-x-2 w-full text-nowrap mb-2 text-white">
                 <h1 class="text-3xl font-bold mb-1 text-slate-100">YouTube Remote</h1>
-                <b id="version" class="text-xs text-slate-100/10 font">v0.1.3</b>
+                <b id="version" class="text-xs text-slate-100/10 font"></b>
             </div>
-            <p class="mb-4 text-slate-100/20">Control Youtube players on the same network</p>
+            <p class="mb-4 text-slate-100/20">Control Youtube clients on the same network</p>
             <div class="mb-2 flex items-center group">
                 <div for="recID"
                     class="h-[42px] mr-2 bg-[#18181B]/50 backdrop-blur-lg text-slate-100/30 py-2 px-4 rounded-md border border-white/10 transition">
@@ -33,7 +33,6 @@
                 <input type="text" id="recID" title="YouTube Remote ID"
                     class="h-[42px] text-slate-100 text-base/6 placeholder:text-zinc-500 font-medium p-2 w-full rounded-md border border-white/10 text-slate-100 shadow-sm hover:ring-1 hover:ring-white/10 focus:ring-1 focus:ring-white/10 transition appearance-none rounded-lg focus:outline-none bg-[#18181B]/50 backdrop-blur-lg">
             </div>
-
             <button id="connectButton"
                 class="group flex items-center justify-center text-white py-2 px-4 rounded-md w-full bg-[#18181B]/50 backdrop-blur-lg font-bold border border-white/10 text-slate-100 shadow-sm hover:bg-white/10 hover:ring-1 hover:ring-white/10 transition">
                 <div class="flex items-center space-x-2">
@@ -51,31 +50,25 @@
         <div class="bg-[#1e1e1f] text-slate-100 p-8 rounded-b-[25px] shadow-lg w-110 mt-2"
             style="background-size: 100% 100%;background-position: 0px 0px,0px 0px,0px 0px;background-image: radial-gradient(33% 43% at 5% 93%, #ffffff08 7%, #073AFF00 100%);">
             <div class="container mb-4 bg-[#141415] rounded-md border border-white/10" style="height: 200px;">
-                <img
-                    id="artwork"
+                <img id="artwork"
                     style="height: 100%;object-fit: contain;display: block;margin-left: auto;margin-right: auto;"
                     src="">
             </div>
-
             <div style="width: 400px;">
                 <p id="title" style="font-size: large;width: fit-content;">Nothing</p>
                 <p id="artist" class="mb-4 text-slate-100/40">The silence is deafening</p>
             </div>
-
             <div class="group mb-4 flex items-center space-x-4 opacity-45 hover:opacity-90 transition">
                 <svg fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-6">
                     <path stroke-linecap="round" stroke-linejoin="round"
                         d="M17.25 9.75 19.5 12m0 0 2.25 2.25M19.5 12l2.25-2.25M19.5 12l-2.25 2.25m-10.5-6 4.72-4.72a.75.75 0 0 1 1.28.53v15.88a.75.75 0 0 1-1.28.53l-4.72-4.72H4.51c-.88 0-1.704-.507-1.938-1.354A9.009 9.009 0 0 1 2.25 12c0-.83.112-1.633.322-2.396C2.806 8.756 3.63 8.25 4.51 8.25H6.75Z" />
                 </svg>
-
                 <input id="volumeSlide" type="range" min="0" max="100" step="1" value="90" class="w-full accent-[#fff]">
-
                 <svg fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-6">
                     <path stroke-linecap="round" stroke-linejoin="round"
                         d="M19.114 5.636a9 9 0 0 1 0 12.728M16.463 8.288a5.25 5.25 0 0 1 0 7.424M6.75 8.25l4.72-4.72a.75.75 0 0 1 1.28.53v15.88a.75.75 0 0 1-1.28.53l-4.72-4.72H4.51c-.88 0-1.704-.507-1.938-1.354A9.009 9.009 0 0 1 2.25 12c0-.83.112-1.633.322-2.396C2.806 8.756 3.63 8.25 4.51 8.25H6.75Z" />
                 </svg>
             </div>
-
             <div class="flex justify-between space-x-2">
                 <button type="button" id="prevButton"
                     class="group text-slate-100 py-2 px-4 rounded flex-1 bg-[#18181B]/50 backdrop-blur-lg font-bold border border-white/10 text-slate-100 shadow-sm hover:ring-1 hover:ring-white/10 transition">
@@ -111,21 +104,17 @@
             <p id="status" class="text-center font-bold text-slate-100/20 mt-2 select-none">Plz wait</p>
         </div>
     </div>
-
-
-
-    
     <div style="display: none;" id="mainCredits">
-        <div class="fixed z-[1] w-full h-full overflow-auto bg-black bg-zinc-950/80 backdrop-blur-lg left-0 top-0" id="mainCredits">
+        <div class="fixed z-[1] w-full h-full overflow-auto bg-black bg-zinc-950/80 backdrop-blur-lg left-0 top-0"
+            id="mainCredits">
             <div id="select-modal" tabindex="-1" class="fixed inset-0 flex items-center justify-center">
                 <div class="p-4 flex ">
                     <div class="bg-[#1e1e1f] text-slate-100 p-2 rounded-[25px] shadow-lg border border-white/10">
                         <div class="p-4">
                             <div class="space-y-4 mb-4 text-slate-100/80">
-                                <div id="bCredits">
+                                <div id="boneCredit">
                                     <div
                                         class="inline-flex items-center justify-between w-full p-5 hover:text-white transition bg-[#18181B]/50 hover:bg-[#141415] rounded-lg cursor-pointer">
-    
                                         <div class="flex items-center space-x-6">
                                             <img alt="Bonehead PFP"
                                                 src="https://avatars.githubusercontent.com/u/47313866?v=4"
@@ -140,7 +129,7 @@
                                         </div>
                                     </div>
                                 </div>
-                                <div id="iCredits">
+                                <div id="infinCredit">
                                     <div
                                         class="inline-flex items-center justify-between w-full p-5 hover:text-white transition bg-[#18181B]/50 hover:bg-[#141415] rounded-lg cursor-pointer">
                                         <div class="flex items-center space-x-6">
@@ -157,26 +146,24 @@
                                         </div>
                                     </div>
                                 </div>
-    
                                 <div class="inline-flex">
-                                    <div id="pCredits" class="flex items-center">
+                                    <div id="peerCredit" class="flex items-center">
                                         <div
                                             class="inline-flex items-center justify-between py-5 px-6 hover:text-white transition bg-[#18181B]/50 hover:bg-[#141415] rounded-lg cursor-pointer">
                                             <div>
                                                 <img alt="PEER JS"
                                                     src="https://avatars.githubusercontent.com/u/3409784?s=200&v=4"
                                                     class="inline-block h-14 w-14 rounded-md" />
-                                                <div class="w-full font-semibold flex items-center justify-center space-x-1">
+                                                <div
+                                                    class="w-full font-semibold flex items-center justify-center space-x-1">
                                                     <p>PEER</p>
                                                     <p class="text-red-400">JS</p>
                                                 </div>
                                             </div>
                                         </div>
                                     </div>
-    
                                     <div class="pl-2 space-y-1 flex flex-col h-full">
-    
-                                        <div id="tCredits">
+                                        <div id="tailCredit">
                                             <div
                                                 class="inline-flex items-center justify-between py-5 px-6 hover:text-white transition bg-[#18181B]/50 hover:bg-[#141415] rounded-lg cursor-pointer">
                                                 <div>
@@ -194,13 +181,13 @@
                                                 </div>
                                             </div>
                                         </div>
-    
                                         <div class="flex justify-between">
                                             <div id="hCredits" class="flex">
                                                 <div
                                                     class="inline-flex items-center justify-center py-3 px-4 hover:text-white transition bg-[#18181B]/50 hover:bg-[#141415] rounded-lg cursor-pointer">
                                                     <svg viewBox="0 0 48 48" class="size-8">
-                                                        <path fill="#E65100" d="M41,5H7l3,34l14,4l14-4L41,5L41,5z"></path>
+                                                        <path fill="#E65100" d="M41,5H7l3,34l14,4l14-4L41,5L41,5z">
+                                                        </path>
                                                         <path fill="#FF6D00" d="M24 8L24 39.9 35.2 36.7 37.7 8z"></path>
                                                         <path fill="#FFF"
                                                             d="M24,25v-4h8.6l-0.7,11.5L24,35.1v-4.2l4.1-1.4l0.3-4.5H24z M32.9,17l0.3-4H24v4H32.9z">
@@ -215,7 +202,8 @@
                                                 <div
                                                     class="inline-flex items-center justify-center py-3 px-4 hover:text-white transition bg-[#18181B]/50 hover:bg-[#141415] rounded-lg cursor-pointer">
                                                     <svg viewBox="0 0 48 48" class="size-8">
-                                                        <path fill="#0277BD" d="M41,5H7l3,34l14,4l14-4L41,5L41,5z"></path>
+                                                        <path fill="#0277BD" d="M41,5H7l3,34l14,4l14-4L41,5L41,5z">
+                                                        </path>
                                                         <path fill="#039BE5" d="M24 8L24 39.9 35.2 36.7 37.7 8z"></path>
                                                         <path fill="#FFF"
                                                             d="M33.1 13L24 13 24 17 28.9 17 28.6 21 24 21 24 25 28.4 25 28.1 29.5 24 30.9 24 35.1 31.9 32.5 32.6 21 32.6 21z">
@@ -240,8 +228,7 @@
                                         </div>
                                     </div>
                                 </div>
-    
-                        </div>
+                            </div>
                         </div>
                         <div class="w-full flex justify-center">
                             <button id="closeCredits" type="button"
@@ -254,13 +241,8 @@
             </div>
         </div>
     </div>
-
-
-
-
     <b id="creditsShow" style="position: fixed;right: 8px;bottom: 8px;"
         class="text-xs text-slate-100/40 font cursor-pointer">Credits</b>
-
     <script src="options.js"></script>
 </body>
 
