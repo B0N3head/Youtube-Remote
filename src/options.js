@@ -2,27 +2,19 @@ console.log(`[Youtube Remote v${chrome.runtime.getManifest().version}]`);
 
 let ytrDebug = true;
 
-let lastPeerId = null;
-let peer = null;
-let conn = null;
+let lastPeerId, peer, conn;
 
-let htmlStatusElement = null;
-let idInputElement = null;
-let creditsElement = null;
+let htmlStatusElement, idInputElement, creditsElement;
 
-let htmlTitle = null;
-let htmlArtist = null;
-let htmlArtwork = null;
+let htmlTitle, htmlArtist, htmlArtwork;
 
-let pauseButton = null;
-let volumeSlider = null;
+let pauseButton, volumeSlider;
 
 let currentUNIX = 0;
 
-const ytrlog = (message) => console.log(`[Youtube Remote] ${message}`);
-const ytrdbg = (message) => ytrDebug && console.warn(`[Youtube Remote] ${message}`);
+const ytrlog = (message) => ytrDebug && console.log(`[Youtube Remote] ${message}`);
 
-const sendData = (data) => conn && conn.open ? (conn.send(data), ytrdbg(data)) : ytrdbg('Connection is closed');
+const sendData = (data) => conn && conn.open ? (conn.send(data), ytrlog(data)) : ytrlog('Connection is closed');
 
 document.addEventListener('DOMContentLoaded', () => {
   // -------- Init --------
@@ -58,7 +50,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // Disallow incoming connections
   peer.on('connection', (c) => {
     c.on('open', () => {
-      ytrdbg('Attempted connection to client closed');
+      ytrlog('Attempted connection to client closed');
       setTimeout(() => { c.close(); }, 250);
     });
   });
@@ -66,7 +58,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // Attempt to reconnect if we lose connection
   peer.on('disconnected', () => {
     htmlStatusElement.innerHTML = 'Connection lost. Attempting reconnection';
-    ytrdbg('Connection lost. Attempting reconnection');
+    ytrlog('Connection lost. Attempting reconnection');
     peer.id = lastPeerId;
     peer._lastServerId = lastPeerId;
     peer.reconnect();
@@ -82,7 +74,7 @@ document.addEventListener('DOMContentLoaded', () => {
   peer.on('error', function (err) {
     if (err.message.startsWith('Could not connect'))
       htmlStatusElement.innerHTML = err.message.replace('peer', 'client');
-    ytrdbg(err.message);
+    ytrlog(err.message);
   });
 
   document.getElementById('connectButton').addEventListener('click', () => {
@@ -126,20 +118,20 @@ document.addEventListener('DOMContentLoaded', () => {
               htmlArtwork.src = connDataJson.artwork;
             break;
 
-          case 'playing': // If the server has messed with the player state, then we send updates to the client in an attempt to keep them synced
+          case 'play': // If the server has messed with the player state, then we send updates to the client in an attempt to keep them synced
             pauseButton.dataset.state = connDataJson.value ? 'playing' : 'paused';
             updateButtonUI();
             break;
 
-          case 'error':
+          case 'reject':
             htmlStatusElement.innerHTML = 'Someone else is already connected :(';
             break;
 
           default:
-            ytrdbg(`Unknown data ${error}`);
+            ytrlog(`Unknown data ${error}`);
         }
       } catch (error) {
-        ytrdbg(`Error parsing data: ${error}`);
+        ytrlog(`Error parsing data: ${error}`);
       }
     });
 
@@ -151,12 +143,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // -------- Event Listeners --------
   document.getElementById('prevButton').addEventListener('click', () => sendData(JSON.stringify({ type: 'prev' })));
-  document.getElementById('pauseButton').addEventListener('click', () => sendData(JSON.stringify({ type: 'pause' })));
+  pauseButton.addEventListener('click', () => sendData(JSON.stringify({ type: 'pause' })));
   document.getElementById('nextButton').addEventListener('click', () => sendData(JSON.stringify({ type: 'next' })));
 
   volumeSlider.addEventListener('mouseup', () => {
     // Logarithmic volume slider
-    const volume = volumeSlider.value != 0 ? Math.pow(10., 0.025 * (volumeSlider.value - 100))*100 : volumeSlider.value;
+    const volume = volumeSlider.value != 0 ? Math.pow(10., 0.025 * (volumeSlider.value - 100)) * 100 : volumeSlider.value;
     sendData(JSON.stringify({ type: 'vol', vol: volume }));
   });
 
@@ -166,7 +158,7 @@ document.addEventListener('DOMContentLoaded', () => {
     else
       creditsElement.style.display = "block";
   }
-  
+
   document.getElementById('closeCredits').addEventListener('click', toggleCredits);
   document.getElementById('creditsShow').addEventListener('click', toggleCredits);
 
@@ -175,9 +167,7 @@ document.addEventListener('DOMContentLoaded', () => {
     'infinCredit': "https://github.com/infinitumio",
     'peerCredit': "https://peerjs.com/",
     'tailCredit': "https://tailwindcss.com/",
-    'hCredits': "https://developer.mozilla.org/en-US/docs/Web/HTML",
-    'cCredits': "https://developer.mozilla.org/en-US/docs/Web/CSS",
-    'jCredits': "https://developer.mozilla.org/en-US/docs/Web/JavaScript"
+    'toastCredit': "https://github.com/apvarun/toastify-js"
   };
 
   Object.keys(links).forEach(id => {
@@ -196,18 +186,18 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById("version").innerHTML = `v${chrome.runtime.getManifest().version}`;
   document.title = `YouTube Remote v${chrome.runtime.getManifest().version}`;
 
-    const updateButtonUI = () => {  
+  const updateButtonUI = () => {
     pauseButton.innerHTML = pauseButton.dataset.state === 'playing'
       ? `<div class="flex justify-center items-center">
           <svg fill="none" viewBox="0 0 24 24" stroke-width="3" stroke="currentColor" class="size-8 stroke-white stroke-white/50 group-hover:stroke-white/20 transition">
             <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 5.25v13.5m-7.5-13.5v13.5" />
           </svg>
-         </div>`
+        </div>`
       : `<div class="flex justify-center items-center">
           <svg fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-8 stroke-white/20 group-hover:stroke-white/50 transition">
             <path stroke-linecap="round" stroke-linejoin="round" d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.347a1.125 1.125 0 0 1 0 1.972l-11.54 6.347a1.125 1.125 0 0 1-1.667-.986V5.653Z" />
           </svg>
-         </div>`;
+        </div>`;
   }
 });
 
@@ -434,4 +424,3 @@ Check your Browserslist config to be sure that your targets are set up correctly
     } rb.exports = sr; function sr(...i) { let e; if (i.length === 1 && dO(i[0]) ? (e = i[0], i = void 0) : i.length === 0 || i.length === 1 && !i[0] ? i = void 0 : i.length <= 2 && (Array.isArray(i[0]) || !i[0]) ? (e = i[1], i = i[0]) : typeof i[i.length - 1] == "object" && (e = i.pop()), e || (e = {}), e.browser) throw new Error("Change `browser` option to `overrideBrowserslist` in Autoprefixer"); if (e.browserslist) throw new Error("Change `browserslist` option to `overrideBrowserslist` in Autoprefixer"); e.overrideBrowserslist ? i = e.overrideBrowserslist : e.browsers && (typeof console != "undefined" && console.warn && (Zl.red ? console.warn(Zl.red(tb.replace(/`[^`]+`/g, n => Zl.yellow(n.slice(1, -1))))) : console.warn(tb)), i = e.browsers); let t = { ignoreUnknownVersions: e.ignoreUnknownVersions, stats: e.stats, env: e.env }; function r(n) { let a = eb, s = new uO(a.browsers, i, n, t), o = s.selected.join(", ") + JSON.stringify(e); return eu.has(o) || eu.set(o, new fO(a.prefixes, s, e)), eu.get(o) } return { postcssPlugin: "autoprefixer", prepare(n) { let a = r({ from: n.opts.from, env: e.env }); return { OnceExit(s) { hO(n, a), e.remove !== !1 && a.processor.remove(s, n), e.add !== !1 && a.processor.add(s, n) } } }, info(n) { return n = n || {}, n.from = n.from || h.cwd(), pO(r(n)) }, options: e, browsers: i } } sr.postcss = !0; sr.data = eb; sr.defaults = oO.defaults; sr.info = () => sr().info()
   }); var nb = {}; _e(nb, { default: () => mO }); var mO, sb = C(() => { l(); mO = [] }); var ob = {}; _e(ob, { default: () => gO }); var ab, gO, lb = C(() => { l(); hi(); ab = X(bi()), gO = Ze(ab.default.theme) }); var fb = {}; _e(fb, { default: () => yO }); var ub, yO, cb = C(() => { l(); hi(); ub = X(bi()), yO = Ze(ub.default) }); l(); "use strict"; var wO = Je(pm()), bO = Je(ye()), vO = Je(ib()), xO = Je((sb(), nb)), kO = Je((lb(), ob)), SO = Je((cb(), fb)), CO = Je((Zn(), bu)), AO = Je((mo(), ho)), _O = Je((hs(), Ku)); function Je(i) { return i && i.__esModule ? i : { default: i } } var Hn = "tailwind", tu = "text/tailwindcss", pb = "/template.html", St, db = !0, hb = 0, ru = new Set, iu, mb = "", gb = (i = !1) => ({ get(e, t) { return (!i || t === "config") && typeof e[t] == "object" && e[t] !== null ? new Proxy(e[t], gb()) : e[t] }, set(e, t, r) { return e[t] = r, (!i || t === "config") && nu(!0), !0 } }); window[Hn] = new Proxy({ config: {}, defaultTheme: kO.default, defaultConfig: SO.default, colors: CO.default, plugin: AO.default, resolveConfig: _O.default }, gb(!0)); function yb(i) { iu.observe(i, { attributes: !0, attributeFilter: ["type"], characterData: !0, subtree: !0, childList: !0 }) } new MutationObserver(async i => { let e = !1; if (!iu) { iu = new MutationObserver(async () => await nu(!0)); for (let t of document.querySelectorAll(`style[type="${tu}"]`)) yb(t) } for (let t of i) for (let r of t.addedNodes) r.nodeType === 1 && r.tagName === "STYLE" && r.getAttribute("type") === tu && (yb(r), e = !0); await nu(e) }).observe(document.documentElement, { attributes: !0, attributeFilter: ["class"], childList: !0, subtree: !0 }); async function nu(i = !1) { i && (hb++, ru.clear()); let e = ""; for (let r of document.querySelectorAll(`style[type="${tu}"]`)) e += r.textContent; let t = new Set; for (let r of document.querySelectorAll("[class]")) for (let n of r.classList) ru.has(n) || t.add(n); if (document.body && (db || t.size > 0 || e !== mb || !St || !St.isConnected)) { for (let n of t) ru.add(n); db = !1, mb = e, self[pb] = Array.from(t).join(" "); let { css: r } = await (0, bO.default)([(0, wO.default)({ ...window[Hn].config, _hash: hb, content: { files: [pb], extract: { html: n => n.split(" ") } }, plugins: [...xO.default, ...Array.isArray(window[Hn].config.plugins) ? window[Hn].config.plugins : []] }), (0, vO.default)({ remove: !1 })]).process(`@tailwind base;@tailwind components;@tailwind utilities;${e}`); (!St || !St.isConnected) && (St = document.createElement("style"), document.head.append(St)), St.textContent = r } }
 })();
-/*! https://mths.be/cssesc v3.0.0 by @mathias */

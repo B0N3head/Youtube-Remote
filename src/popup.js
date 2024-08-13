@@ -3,24 +3,24 @@ console.log(`[Youtube Remote v${chrome.runtime.getManifest().version}]`);
 document.addEventListener('DOMContentLoaded', () => {
 
   document.getElementById("version").innerHTML = `v${chrome.runtime.getManifest().version}`;
-  document.title =`YouTube Remote v${chrome.runtime.getManifest().version}`;
+  document.title = `YouTube Remote v${chrome.runtime.getManifest().version}`;
 
   chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
     if (tabs.length && tabs[0].url.includes('youtube.com')) {
-      try {
-        chrome.tabs.sendMessage(tabs[0].id, { action: 'getID' }, (response) => {
-          const idElement = document.getElementById('id');
-          if (response && response.peerID) {
-            idElement.textContent = response.peerID;
-            idElement.className = "h-[28px] group-hover:text-white text-yellow-400 py-[4px] px-2 rounded-md border border-white/10 transition w-full";
-          } else {
-            idElement.textContent = 'Plz refresh the page';
-            idElement.className = "h-[28px] group-hover:text-white text-slate-100 py-[4px] px-2 rounded-md border border-white/10 transition w-full";
-          }
-        });
-      } catch (err) {
-        console.error('Error sending message to tab:', err);
-      }
+      chrome.tabs.sendMessage(tabs[0].id, { action: 'getID' }, (response) => {
+        // Suppress throwing "Unchecked runtime.lastError" if the tab isn't ready
+        if (chrome.runtime.lastError)
+          console.log("Tab not ready");
+
+        const idElement = document.getElementById('id');
+        if (response) {
+          idElement.textContent = response.peerID;
+          idElement.className = "h-[28px] group-hover:text-white text-yellow-400 py-[4px] px-2 rounded-md border border-white/10 transition w-full";
+        } else {
+          idElement.textContent = 'Too quick, reopen me ;D';
+          idElement.className = "h-[28px] group-hover:text-white text-slate-100 py-[4px] px-2 rounded-md border border-white/10 transition w-full";
+        }
+      });
     } else {
       document.getElementById('id').textContent = 'Site not supported';
     }

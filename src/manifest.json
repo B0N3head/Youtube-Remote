@@ -1,8 +1,8 @@
 {
   "name": "YouTube Remote",
   "short_name": "YT Remote",
-  "version": "0.2.2",
-  "description": "Control Youtube clients on the same network",
+  "version": "1.0.0",
+  "description": "Control Youtube clients on your network",
   "permissions": [
     "scripting",
     "tabs",
