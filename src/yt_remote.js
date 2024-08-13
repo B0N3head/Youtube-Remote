@@ -62,7 +62,11 @@ function nextSong() {
 function prevSong() {
     if (prevButton === null) return;
     if (youtubeNonStop) lastInteractionTime = new Date().getTime();
-    prevButton.click();
+    // Normal youtube.com video won't show prev button (unless in queue)
+    if (!isYTMusic && prevButton.style.display === "none")
+        window.history.back();
+    else
+        prevButton.click();
 }
 
 function pauseSong() {
@@ -124,6 +128,7 @@ function initPeerJS() {
         ytrlog("Connected to: " + conn.peer);
         // Reset metadata incase it has already been collected
         lastMetaData = null;
+        pauseFound = null;
 
         conn.on('data', (data) => {
             try {

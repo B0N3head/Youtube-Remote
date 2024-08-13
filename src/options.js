@@ -1,6 +1,6 @@
 console.log(`[Youtube Remote v${chrome.runtime.getManifest().version}]`);
 
-let ytrDebug = false;
+let ytrDebug = true;
 
 let lastPeerId = null;
 let peer = null;
@@ -156,10 +156,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
   volumeSlider.addEventListener('mouseup', () => {
     // Logarithmic volume slider
-    const volume = volumeSlider.value != 0 ? Math.pow(10., 0.025 * (volumeSlider.value - 100)) : volumeSlider.value;
+    const volume = volumeSlider.value != 0 ? Math.pow(10., 0.025 * (volumeSlider.value - 100))*100 : volumeSlider.value;
     sendData(JSON.stringify({ type: 'vol', vol: volume }));
   });
 
+  const toggleCredits = () => {
+    if (creditsElement.style.display === "block")
+      creditsElement.style.display = "none";
+    else
+      creditsElement.style.display = "block";
+  }
+  
   document.getElementById('closeCredits').addEventListener('click', toggleCredits);
   document.getElementById('creditsShow').addEventListener('click', toggleCredits);
 
@@ -189,14 +196,7 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById("version").innerHTML = `v${chrome.runtime.getManifest().version}`;
   document.title = `YouTube Remote v${chrome.runtime.getManifest().version}`;
 
-  const toggleCredits = () => {
-    if (creditsElement.style.display === "block")
-      creditsElement.style.display = "none";
-    else
-      creditsElement.style.display = "block";
-  }
-
-  const updateButtonUI = () => {
+    const updateButtonUI = () => {  
     pauseButton.innerHTML = pauseButton.dataset.state === 'playing'
       ? `<div class="flex justify-center items-center">
           <svg fill="none" viewBox="0 0 24 24" stroke-width="3" stroke="currentColor" class="size-8 stroke-white stroke-white/50 group-hover:stroke-white/20 transition">
