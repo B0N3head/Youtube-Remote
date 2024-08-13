@@ -197,20 +197,34 @@ document.addEventListener('DOMContentLoaded', () => {
     toggleCredits();
   });
 
+  // Links that open on separate tab from credits
+
   document.getElementById('bCredits').addEventListener('click', () => {
-    window.location.href = "https://github.com/B0N3head";
+    window.open("https://github.com/B0N3head", '_blank');
   });
 
   document.getElementById('iCredits').addEventListener('click', () => {
-    window.location.href = "https://github.com/infinitumio";
+    window.open("https://github.com/infinitumio", '_blank');
   });
 
   document.getElementById('pCredits').addEventListener('click', () => {
-    window.location.href = "https://peerjs.com/";
+    window.open("https://peerjs.com/", '_blank');
   });
 
   document.getElementById('tCredits').addEventListener('click', () => {
-    window.location.href = "https://tailwindcss.com/";
+    window.open("https://tailwindcss.com/", '_blank');
+  });
+
+  document.getElementById('hCredits').addEventListener('click', () => {
+    window.open("https://developer.mozilla.org/en-US/docs/Web/HTML", '_blank');
+  });
+
+  document.getElementById('cCredits').addEventListener('click', () => {
+    window.open("https://developer.mozilla.org/en-US/docs/Web/CSS", '_blank');
+  });
+
+  document.getElementById('jCredits').addEventListener('click', () => {
+    window.open("https://developer.mozilla.org/en-US/docs/Web/JavaScript", '_blank');
   });
 
   pauseButton.addEventListener('click', () => {
