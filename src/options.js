@@ -10,11 +10,14 @@ let htmlTitle, htmlArtist, htmlArtwork;
 
 let pauseButton, volumeSlider;
 
+let waitIconElement, readyIconElement, connectText, isReady;
+
 let currentUNIX = 0;
 
 const ytrlog = (message) => ytrDebug && console.log(`[Youtube Remote] ${message}`);
 
 const sendData = (data) => conn && conn.open ? (conn.send(data), ytrlog(data)) : ytrlog('Connection is closed');
+
 
 document.addEventListener('DOMContentLoaded', () => {
   // -------- Init --------
@@ -30,7 +33,48 @@ document.addEventListener('DOMContentLoaded', () => {
   pauseButton = document.getElementById('pauseButton');
   volumeSlider = document.getElementById('volumeSlide');
 
-  idInputElement.disabled = true;
+  waitIconElement = document.getElementById('waitIcon');
+  readyIconElement = document.getElementById('readyIcon');
+  connectText = document.getElementById('connectText');
+
+  // -------- Misc --------
+
+  const notLoading = (ready) => {
+    isReady = ready;
+    if (ready) {
+      connectText.innerHTML = 'Connect';
+      waitIconElement.style.display = "none";
+      readyIconElement.style.display = "block";
+    }
+    else {
+      connectText.innerHTML = 'Please Wait';
+      waitIconElement.style.display = "block";
+      readyIconElement.style.display = "none";
+    }
+  }
+
+  const toggleCredits = () => {
+    if (creditsElement.style.display == "block") {
+      creditsElement.style.display = "none";
+    }
+    else {
+      creditsElement.style.display = "block";
+    }
+  }
+
+  const updateButtonUI = () => {
+    pauseButton.innerHTML = pauseButton.dataset.state === 'playing'
+      ? `<div class="flex justify-center items-center">
+          <svg fill="none" viewBox="0 0 24 24" stroke-width="3" stroke="currentColor" class="size-8 stroke-white stroke-white/50 group-hover:stroke-white/20 transition">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 5.25v13.5m-7.5-13.5v13.5" />
+          </svg>
+        </div>`
+      : `<div class="flex justify-center items-center">
+          <svg fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-8 stroke-white/20 group-hover:stroke-white/50 transition">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.347a1.125 1.125 0 0 1 0 1.972l-11.54 6.347a1.125 1.125 0 0 1-1.667-.986V5.653Z" />
+          </svg>
+        </div>`;
+  }
 
   // -------- PeerJS --------
 
@@ -42,9 +86,9 @@ document.addEventListener('DOMContentLoaded', () => {
     ytrlog('ID: ' + peer.id);
 
     // Let the user know we are ready
+    notLoading(true);
     htmlStatusElement.innerHTML = 'Ready';
-    idInputElement.disabled = false;
-    document.getElementById('connectText').className = "text-slate-100  group-hover:text-white transition";
+    connectText.className = "text-slate-100  group-hover:text-white transition";
   });
 
   // Disallow incoming connections
@@ -64,12 +108,14 @@ document.addEventListener('DOMContentLoaded', () => {
       peer._lastServerId = lastPeerId;
       peer.reconnect();
     }, 250);
+    notLoading(true);
   });
 
   // Usually only fires if the peer has a serious issue, just ask for a refresh
   peer.on('close', function () {
     conn = null;
     htmlStatusElement.innerHTML = 'Something went wrong. Plz refresh the page';
+    notLoading(true);
   });
 
   // Log all errors (to debug) but show the ones that revolve around crappy user input
@@ -77,9 +123,16 @@ document.addEventListener('DOMContentLoaded', () => {
     if (err.message.startsWith('Could not connect'))
       htmlStatusElement.innerHTML = err.message.replace('peer', 'client');
     ytrlog(err.message);
+    notLoading(true);
   });
 
   document.getElementById('connectButton').addEventListener('click', () => {
+    // Ignore user input
+    if (!isReady)
+      return;
+
+    notLoading(false);
+
     // Disconnect any old connections
     if (conn) {
       htmlStatusElement.innerHTML = 'Disconnecting...';
@@ -97,13 +150,14 @@ document.addEventListener('DOMContentLoaded', () => {
     conn.on('open', () => {
       htmlStatusElement.innerHTML = 'Connected to: ' + conn.peer;
       ytrlog('Connected to: ' + conn.peer.toUpperCase());
+      notLoading(true);
     });
 
     // Handle incoming data (messages only since this is the signal sender)
     conn.on('data', (data) => {
       try {
         // Used for checking client pulse (no pong as the ping would error + we don't care about latency)
-        if (data === "ping")
+        if (data == "ping")
           return;
 
         const connDataJson = JSON.parse(data);
@@ -140,6 +194,7 @@ document.addEventListener('DOMContentLoaded', () => {
     conn.on('close', () => {
       htmlStatusElement.innerHTML = 'Connection closed';
       setTimeout(() => { htmlStatusElement.innerHTML = 'Ready'; }, 500);
+      notLoading(true);
     });
   });
 
@@ -153,13 +208,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const volume = volumeSlider.value != 0 ? Math.pow(10., 0.025 * (volumeSlider.value - 100)) * 100 : volumeSlider.value;
     sendData(JSON.stringify({ type: 'vol', vol: volume }));
   });
-
-  const toggleCredits = () => {
-    if (creditsElement.style.display === "block")
-      creditsElement.style.display = "none";
-    else
-      creditsElement.style.display = "block";
-  }
 
   document.getElementById('closeCredits').addEventListener('click', toggleCredits);
   document.getElementById('creditsShow').addEventListener('click', toggleCredits);
@@ -182,25 +230,9 @@ document.addEventListener('DOMContentLoaded', () => {
     updateButtonUI()
   });
 
-  // -------- Misc --------
-
   // Change all references to the version to load from the manifest file
   document.getElementById("version").innerHTML = `v${chrome.runtime.getManifest().version}`;
   document.title = `YouTube Remote v${chrome.runtime.getManifest().version}`;
-
-  const updateButtonUI = () => {
-    pauseButton.innerHTML = pauseButton.dataset.state === 'playing'
-      ? `<div class="flex justify-center items-center">
-          <svg fill="none" viewBox="0 0 24 24" stroke-width="3" stroke="currentColor" class="size-8 stroke-white stroke-white/50 group-hover:stroke-white/20 transition">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 5.25v13.5m-7.5-13.5v13.5" />
-          </svg>
-        </div>`
-      : `<div class="flex justify-center items-center">
-          <svg fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-8 stroke-white/20 group-hover:stroke-white/50 transition">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.347a1.125 1.125 0 0 1 0 1.972l-11.54 6.347a1.125 1.125 0 0 1-1.667-.986V5.653Z" />
-          </svg>
-        </div>`;
-  }
 });
 
 // peerjs.min.js

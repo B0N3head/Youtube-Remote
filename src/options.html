@@ -2,6 +2,7 @@
 <html lang="en">
 
 <head>
+    <title>YouTube Remote</title>
     <style>
         body {
             width: 100%;
@@ -36,13 +37,20 @@
             <button id="connectButton"
                 class="group flex items-center justify-center text-white py-2 px-4 rounded-md w-full bg-[#18181B]/50 backdrop-blur-lg font-bold border border-white/10 text-slate-100 shadow-sm hover:bg-white/10 hover:ring-1 hover:ring-white/10 transition">
                 <div class="flex items-center space-x-2">
-                    <svg fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"
-                        class="size-4 stroke-white/40 group-hover:stroke-white transition">
+                    <svg id="waitIcon" class="animate-spin -ml-1 h-5 w-5 text-white" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4">
+                        </circle>
+                        <path class="opacity-75" fill="currentColor"
+                            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
+                        </path>
+                    </svg>
+                    <svg id="readyIcon" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"
+                        class="size-4 stroke-white/40 group-hover:stroke-white transition" style="display: none;">
                         <path stroke-linecap="round" stroke-linejoin="round"
                             d="M13.19 8.688a4.5 4.5 0 0 1 1.242 7.244l-4.5 4.5a4.5 4.5 0 0 1-6.364-6.364l1.757-1.757m13.35-.622 1.757-1.757a4.5 4.5 0 0 0-6.364-6.364l-4.5 4.5a4.5 4.5 0 0 0 1.242 7.244" />
                     </svg>
                     <p id="connectText" class="text-white/40 group-hover:text-white transition">
-                        Connect
+                        Starting Up
                     </p>
                 </div>
             </button>
@@ -151,7 +159,7 @@
                                         <div
                                             class="inline-flex items-center justify-between py-5 px-6 hover:text-white transition bg-[#18181B]/50 hover:bg-[#141415] rounded-lg cursor-pointer">
                                             <div>
-                                                
+
                                                 <img alt="PEER JS"
                                                     src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAGQAAABkCAYAAABw4pVUAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAAMTSURBVHhe7dw7axRRAAXgWUWNEh8QwWdjIwEb7URB7cVC8QF2Iv4BUazsLeKPsNVCsRGsYmGKgJpKUoppDGihSHwQo+fMndFxve7O7N4NZ/R8cNh7M5sQ5mRm57GbzMzMzMzMzMzMzOxfcxNZQA7nM1i8dHqB4fjawcnxYj5bLLvCOb5+spjPcc5xBecvw1DTmuJR0TZkL7IhnwWcM8TfneNd+SzLxhHON+WzLNuNlM8tcb4nDDV1ikdFt5GryAnkCb+Av/4tfJyam/9wZOf2DrIZ0xXMP2LZeozHZt68XUKWMeeyDp/L7yl8Rzjfms+sERbCFXg8n6XBn/c+DDUp77JK0whXJFPuvsp5rxxAqPo1eW0o5L/iQsS4EDEuRExbC7mL3A/DP8wgXC59NNVG5WFvNdWTRJ6TdC9nziFV3ct92JvQY4SHwXVwC6r7XBltK+QYUvdE8SiS8qRyVfhFXYwLEeNCxLgQS6buYW+reAsRo3iDaiOyLwx/033rlVtI7CTvPHIvDH/i3UPegaxaQl6FofXCe+ixXdEhpKrJLmsZ6X4eL7HIadMu6xmyLgwbeYqsDUMbxN+2EOYrUr2edQrhrmcF4VZwB6l6hMR+DiO5hSjqVUiZG0gvk8hnJPa9ZVxITXUKKTOPsBy+kF9GHiBfkNhzu+NCampSyDDxi7r150LEuBAxLkSMCxHjQsS4EDGKhfAMezUsFo/WB69VxU7kUuciIkf1AzufkLEwHBleAeZFSSmqryG3isdR4fUuuTKU8Q8ltptJlTOINfQCia3MFFH+bKWsHUhsZQ6bKcQGxEPT2EodJjaE/UhspQ6ah4i0NuxLeR99kDc3xPCfCvCQWlYbLp2keific0S6jDaJva+qaSYQS+Q6ElvJdfMOscRiK7pueHBgiZ1FYiu7X/J/XNMWbTtj5ZXgC0id14NvCN+n9TqfmZmZ/eKPtNnouRAxLkSMCxHjQsS4EDEuRIwLEeNCxLgQMS5EjAsR40LEuBAxLkSMCxHjQsS4EDEuRIwLMTMzMzMzMzMzMzNLLMt+ACinpQGSXBeaAAAAAElFTkSuQmCC"
                                                     class="inline-block h-14 w-14 rounded-md" />
@@ -183,10 +191,12 @@
                                             </div>
                                         </div>
                                         <div id="toastCredit">
-                                            <div class="w-full inline-flex items-center justify-between py-4 px-6 hover:text-white transition bg-[#18181B]/50 hover:bg-[#141415] rounded-lg cursor-pointer">
-                                        <div class="w-full font-semibold flex items-center justify-center space-x-1">
+                                            <div
+                                                class="w-full inline-flex items-center justify-between py-4 px-6 hover:text-white transition bg-[#18181B]/50 hover:bg-[#141415] rounded-lg cursor-pointer">
+                                                <div
+                                                    class="w-full font-semibold flex items-center justify-center space-x-1">
                                                     <p>Toastify JS</p>
-                                                </div>        
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
