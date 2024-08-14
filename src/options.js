@@ -59,9 +59,11 @@ document.addEventListener('DOMContentLoaded', () => {
   peer.on('disconnected', () => {
     htmlStatusElement.innerHTML = 'Connection lost. Attempting reconnection';
     ytrlog('Connection lost. Attempting reconnection');
-    peer.id = lastPeerId;
-    peer._lastServerId = lastPeerId;
-    peer.reconnect();
+    setTimeout(() => {
+      peer.id = lastPeerId;
+      peer._lastServerId = lastPeerId;
+      peer.reconnect();
+    }, 250);
   });
 
   // Usually only fires if the peer has a serious issue, just ask for a refresh
@@ -94,7 +96,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Lets tell the user we connected successfully 
     conn.on('open', () => {
       htmlStatusElement.innerHTML = 'Connected to: ' + conn.peer;
-      ytrlog('Connected to: ' + conn.peer);
+      ytrlog('Connected to: ' + conn.peer.toUpperCase());
     });
 
     // Handle incoming data (messages only since this is the signal sender)

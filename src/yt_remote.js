@@ -260,7 +260,7 @@ const interval = setInterval(function () {
     let pauseFound = (navigator.mediaSession.playbackState == "playing")
     if (pauseFound != lastPause && lastPause != null) {
         if (conn && conn.open)
-            conn.send(JSON.stringify({ type: "play", value: isPlaying }));
+            conn.send(JSON.stringify({ type: "play", value: pauseFound }));
     }
     lastPause = pauseFound;
 
