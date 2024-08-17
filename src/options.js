@@ -1,16 +1,29 @@
 console.log(`[Youtube Remote v${chrome.runtime.getManifest().version}]`);
 
-let ytrDebug = true;
+const ytrDebug = true;
 
 let lastPeerId, peer, conn;
 
-let htmlStatusElement, idInputElement, creditsElement;
+// PeerJS
+const idInputElement = document.getElementById('recID');
+const htmlStatusElement = document.getElementById('status');
+const connectText = document.getElementById('connectText');
 
-let htmlTitle, htmlArtist, htmlArtwork;
+// Metadata
+const htmlTitle = document.getElementById('title');
+const htmlArtist = document.getElementById('artist');
+const htmlArtwork = document.getElementById('artwork');
 
-let pauseButton, volumeSlider;
+// Media user inputs
+const nextButton = document.getElementById('nextButton');
+const pauseButton = document.getElementById('pauseButton');
+const prevButton = document.getElementById('prevButton');
+const volumeSlider = document.getElementById('volumeSlide');
 
-let waitIconElement, readyIconElement, connectText, isReady;
+// Misc
+const waitIconElement = document.getElementById('waitIcon');
+const readyIconElement = document.getElementById('readyIcon');
+const creditsElement = document.getElementById('mainCredits');
 
 let currentUNIX = 0;
 
@@ -18,47 +31,23 @@ const ytrlog = (message) => ytrDebug && console.log(`[Youtube Remote] ${message}
 
 const sendData = (data) => conn && conn.open ? (conn.send(data), ytrlog(data)) : ytrlog('Connection is closed');
 
-
 document.addEventListener('DOMContentLoaded', () => {
   // -------- Init --------
 
-  idInputElement = document.getElementById('recID');
-  htmlStatusElement = document.getElementById('status');
-  creditsElement = document.getElementById('mainCredits');
-
-  htmlTitle = document.getElementById('title');
-  htmlArtist = document.getElementById('artist');
-  htmlArtwork = document.getElementById('artwork');
-
-  pauseButton = document.getElementById('pauseButton');
-  volumeSlider = document.getElementById('volumeSlide');
-
-  waitIconElement = document.getElementById('waitIcon');
-  readyIconElement = document.getElementById('readyIcon');
-  connectText = document.getElementById('connectText');
 
   // -------- Misc --------
 
-  const notLoading = (ready) => {
-    isReady = ready;
-    if (ready) {
-      connectText.innerHTML = 'Connect';
-      waitIconElement.style.display = "none";
-      readyIconElement.style.display = "block";
-    }
-    else {
+  const showLoading = (loading) => {
+    isLoading = loading;
+    if (loading) {
       connectText.innerHTML = 'Please Wait';
       waitIconElement.style.display = "block";
       readyIconElement.style.display = "none";
     }
-  }
-
-  const toggleCredits = () => {
-    if (creditsElement.style.display == "block") {
-      creditsElement.style.display = "none";
-    }
     else {
-      creditsElement.style.display = "block";
+      connectText.innerHTML = 'Connect';
+      waitIconElement.style.display = "none";
+      readyIconElement.style.display = "block";
     }
   }
 
@@ -86,7 +75,7 @@ document.addEventListener('DOMContentLoaded', () => {
     ytrlog('ID: ' + peer.id);
 
     // Let the user know we are ready
-    notLoading(true);
+    showLoading(false);
     htmlStatusElement.innerHTML = 'Ready';
     connectText.className = "text-slate-100  group-hover:text-white transition";
   });
@@ -108,30 +97,35 @@ document.addEventListener('DOMContentLoaded', () => {
       peer._lastServerId = lastPeerId;
       peer.reconnect();
     }, 250);
-    notLoading(true);
+    showLoading(false);
   });
 
   // Usually only fires if the peer has a serious issue, just ask for a refresh
   peer.on('close', function () {
     conn = null;
     htmlStatusElement.innerHTML = 'Something went wrong. Plz refresh the page';
-    notLoading(true);
+    showLoading(false);
   });
 
   // Log all errors (to debug) but show the ones that revolve around crappy user input
   peer.on('error', function (err) {
-    if (err.message.startsWith('Could not connect'))
-      htmlStatusElement.innerHTML = err.message.replace('peer', 'client');
-    ytrlog(err.message);
-    notLoading(true);
+    switch (err.code) {
+      case 'browser-incompatible':
+        alert("Your browser does not support WebRTC\nPlease disable any blocking extensions and/or check that your browser supports WebRTC");
+        break;
+      case 'peer-unavailable':
+        htmlStatusElement.innerHTML = `Could not connect to ${lastPeerId.toUpperCase()} sd`;
+        break;
+    }
+    showLoading(false);
   });
 
   document.getElementById('connectButton').addEventListener('click', () => {
     // Ignore user input
-    if (!isReady)
+    if (isLoading)
       return;
 
-    notLoading(false);
+    showLoading(true);
 
     // Disconnect any old connections
     if (conn) {
@@ -149,8 +143,8 @@ document.addEventListener('DOMContentLoaded', () => {
     // Lets tell the user we connected successfully 
     conn.on('open', () => {
       htmlStatusElement.innerHTML = 'Connected to: ' + conn.peer;
-      ytrlog('Connected to: ' + conn.peer.toUpperCase());
-      notLoading(true);
+      ytrlog('Connected to: ' + lastPeerId.toUpperCase());
+      showLoading(false);
     });
 
     // Handle incoming data (messages only since this is the signal sender)
@@ -179,7 +173,7 @@ document.addEventListener('DOMContentLoaded', () => {
             updateButtonUI();
             break;
 
-          case 'reject':
+          case 'reject': // Our request has been politely declined :(
             htmlStatusElement.innerHTML = 'Someone else is already connected :(';
             break;
 
@@ -194,21 +188,23 @@ document.addEventListener('DOMContentLoaded', () => {
     conn.on('close', () => {
       htmlStatusElement.innerHTML = 'Connection closed';
       setTimeout(() => { htmlStatusElement.innerHTML = 'Ready'; }, 500);
-      notLoading(true);
+      showLoading(false);
     });
   });
 
   // -------- Event Listeners --------
-  document.getElementById('prevButton').addEventListener('click', () => sendData(JSON.stringify({ type: 'prev' })));
+  prevButton.addEventListener('click', () => sendData(JSON.stringify({ type: 'prev' })));
   pauseButton.addEventListener('click', () => sendData(JSON.stringify({ type: 'pause' })));
-  document.getElementById('nextButton').addEventListener('click', () => sendData(JSON.stringify({ type: 'next' })));
+  nextButton.addEventListener('click', () => sendData(JSON.stringify({ type: 'next' })));
 
   volumeSlider.addEventListener('mouseup', () => {
-    // Logarithmic volume slider
-    const volume = volumeSlider.value != 0 ? Math.pow(10., 0.025 * (volumeSlider.value - 100)) * 100 : volumeSlider.value;
+    // easeInOutSine volume slider
+    //-\frac{\left(\cos\left(0.01\pi x\right)-1\right)}{2}
+    const volume = volumeSlider.value != 0 ? -(Math.cos(Math.PI * 0.01 * volumeSlider.value) - 1) * 50 : volumeSlider.value;
     sendData(JSON.stringify({ type: 'vol', vol: volume }));
   });
 
+  const toggleCredits = () => creditsElement.style.display = creditsElement.style.display == "block" ? "none" : "block";
   document.getElementById('closeCredits').addEventListener('click', toggleCredits);
   document.getElementById('creditsShow').addEventListener('click', toggleCredits);
 

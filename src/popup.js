@@ -1,7 +1,6 @@
 console.log(`[Youtube Remote v${chrome.runtime.getManifest().version}]`);
 
 document.addEventListener('DOMContentLoaded', () => {
-
   document.getElementById("version").innerHTML = `v${chrome.runtime.getManifest().version}`;
   document.title = `YouTube Remote v${chrome.runtime.getManifest().version}`;
 
@@ -10,7 +9,7 @@ document.addEventListener('DOMContentLoaded', () => {
       chrome.tabs.sendMessage(tabs[0].id, { action: 'getID' }, (response) => {
         // Suppress throwing "Unchecked runtime.lastError" if the tab isn't ready
         if (chrome.runtime.lastError)
-          console.log("Tab not ready");
+          console.log("[Youtube Remote] Tab not ready");
 
         const idElement = document.getElementById('id');
         if (response) {
@@ -30,6 +29,33 @@ document.addEventListener('DOMContentLoaded', () => {
     chrome.runtime.openOptionsPage();
   });
 });
+
+// TODO:
+// - Read/Write YTRemote_isLocalConnectionOnly from local storage
+// - Create toggle to effect this value in popup.html
+// - Create listeners in yt_remote and options for if this value changes
+
+const readFromLocalStorage = (key) => {
+  return new Promise((resolve, reject) => {
+      try {
+          const value = localStorage.getItem(key);
+          resolve(value);
+      } catch (error) {
+          reject(error);
+      }
+  });
+};
+
+const writeToLocalStorage = (key, value) => {
+  return new Promise((resolve, reject) => {
+      try {
+          localStorage.setItem(key, value);
+          resolve();
+      } catch (error) {
+          reject(error);
+      }
+  });
+};
 
 // tailwindcss 3.4.5
 (() => {
