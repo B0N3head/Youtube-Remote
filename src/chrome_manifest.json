@@ -1,0 +1,57 @@
+{
+  "name": "YouTube Remote",
+  "short_name": "YT Remote",
+  "version": "1.0.2",
+  "description": "Control Youtube clients on your network",
+  "permissions": [
+    "tabs",
+    "storage",
+    "background"
+  ],
+  "background": {
+        "service_worker": "background.js"
+    },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://www.youtube.com/*",
+        "https://music.youtube.com/*"
+      ],
+      "js": [
+        "content.js"
+      ],
+      "run_at": "document_end"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "yt_remote.js"
+      ],
+      "matches": [
+        "https://www.youtube.com/*",
+        "https://music.youtube.com/*"
+      ]
+    }
+  ],
+  "options_ui": {
+    "page": "options.html",
+    "open_in_tab": true
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icons/ytr16.png",
+      "32": "icons/ytr32.png",
+      "48": "icons/ytr48.png",
+      "128": "icons/ytr128.png"
+    }
+  },
+  "icons": {
+    "16": "icons/ytr16.png",
+    "32": "icons/ytr32.png",
+    "48": "icons/ytr48.png",
+    "128": "icons/ytr128.png"
+  },
+  "manifest_version": 3
+}

@@ -1,17 +1,25 @@
-console.log(`[Youtube Remote v${chrome.runtime.getManifest().version}]`);
+const ytrVersion =chrome.runtime.getManifest().version;
+console.log(`[Youtube Remote v${ytrVersion}]`);
+
+const ytrlog = (message) => ytrDebug && console.log(`[Youtube Remote] ${message}`);
 
 document.addEventListener('DOMContentLoaded', () => {
-  document.getElementById("version").innerHTML = `v${chrome.runtime.getManifest().version}`;
-  document.title = `YouTube Remote v${chrome.runtime.getManifest().version}`;
+  const versionElement = document.getElementById("version");
+  const toggleElement = document.getElementById('local-connection-toggle'); // Local storage trigger for the ui Toggle 
+  const toggleLabel = toggleElement ? toggleElement.nextElementSibling : null;
 
-  const versionElement = document.getElementById("version").innerHTML;
+  // Update extension version
+  if (versionElement) {
+    versionElement.innerHTML = `v${ytrVersion}`;
+    document.title = `YouTube Remote v${ytrVersion}`;
+  }
 
   chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
     if (tabs.length && tabs[0].url.includes('youtube.com')) {
       chrome.tabs.sendMessage(tabs[0].id, { action: 'getID' }, (response) => {
         // Suppress throwing "Unchecked runtime.lastError" if the tab isn't ready
         if (chrome.runtime.lastError)
-          console.log("[Youtube Remote] Tab not ready");
+          ytrlog(" Tab not ready");
 
         const idElement = document.getElementById('id');
         if (response) {
@@ -23,33 +31,16 @@ document.addEventListener('DOMContentLoaded', () => {
         }
       });
     } else {
-      document.getElementById('id').textContent = 'Site not supported';
+      document.getElementById('id').textContent = 'Site not supported D:';
     }
   });
-
-  // Implemented a local storage trigger for the ui Toggle 
-  const toggleElement = document.getElementById('local-connection-toggle');
-  
-  const toggleLabel = toggleElement ? toggleElement.nextElementSibling : null;
-
-  // Display extension version
-  if (versionElement) {
-    versionElement.innerHTML = `v${chrome.runtime.getManifest().version}`;
-    document.title = `YouTube Remote v${chrome.runtime.getManifest().version}`;
-  }
 
   // Initialise the toggle switch state based on local storage
   if (toggleElement) {
     readFromLocalStorage('YTRemote_isLocalConnectionOnly').then((value) => {
       toggleElement.checked = (value === 'true');
-      updateToggleSwitchUI(toggleElement, toggleLabel);
-
-      if (value === 'true') {
-        console.log("[Youtube Remote] Local Connection Only mode is active.");
-      } else if (value === 'false')
-      {
-        console.log("[Youtube Remote] Local Connection Only mode is inactive.");
-      }
+      updateToggleSwitchUI(toggleElement.checked, toggleLabel);
+      ytrlog(`Connection mode is: ${toggleElement.checked ? "local" : "global"}`);
     }).catch((error) => {
       console.error("Error reading from local storage:", error);
     });
@@ -59,14 +50,8 @@ document.addEventListener('DOMContentLoaded', () => {
       const isChecked = event.target.checked;
       writeToLocalStorage('YTRemote_isLocalConnectionOnly', isChecked.toString()).then(() => {
         updateToggleSwitchUI(toggleElement, toggleLabel);
-        
-        if (isChecked) {
-          console.log("[Youtube Remote] Local Connection Only mode is active.");
-        } else if (!isChecked)
-        {
-          console.log("[Youtube Remote] Local Connection Only mode is inactive.");
-        }
-
+        // Can never be null as its added to toggleElement at runtime (won't be added if it can't be found)
+        ytrlog(`Connection mode is: ${isChecked ? "local" : "global"}`);
       }).catch((error) => {
         console.error("Error writing to local storage:", error);
       });
@@ -80,12 +65,8 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 });
 
-
 // TODO:
-// - Read/Write YTRemote_isLocalConnectionOnly from local storage (done)
-// - Create toggle to effect this value in popup.html (done)
 // - Create listeners in yt_remote and options for if this value changes
-
 
 // Read from local storage
 const readFromLocalStorage = (key) => {

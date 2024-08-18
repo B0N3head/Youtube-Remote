@@ -142,8 +142,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Lets tell the user we connected successfully 
     conn.on('open', () => {
-      htmlStatusElement.innerHTML = 'Connected to: ' + conn.peer;
-      ytrlog('Connected to: ' + lastPeerId.toUpperCase());
+      htmlStatusElement.innerHTML = 'Connected to: ' + conn.peer.toUpperCase();
+      ytrlog('Connected to: ' + conn.peer);
       showLoading(false);
     });
 

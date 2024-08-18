@@ -8,6 +8,20 @@ let nextButton, prevButton, pauseButton, muteButton,
 
 const ytrlog = (message) => console.log(`[Youtube Remote] ${message}`);
 
+const sendMessageToContentScript = (_message, _recipient) => {
+    window.postMessage({ type: "YTWebpage", payload: _message, recipient: _recipient }, "*");
+};
+
+// Example usage
+sendMessageToContentScript("Hello from web page");
+
+// Listen for messages from content script
+window.addEventListener("message", (event) => {
+    if (event.source !== window) return;
+    if (event.data.type && event.data.type === "FROM_CONTENT") {
+        console.log("Message from content script:", event.data.payload);
+    }
+});
 // ---------- Element_Hunt ---------- 
 
 const element_search = (id, name) => {
@@ -50,6 +64,7 @@ const findMediaControls = () => {
         isYTMusic ? ["Pause", "Play"] : ["Play (k)", "Pause (k)"]
     );
 
+    // Whats this????
     muteButton = element_search(
         isYTMusic ? "volume" : "ytp-mute-button",
         isYTMusic ? "Mute" : ["Mute (m)", "Unmute (m)"]
@@ -105,7 +120,7 @@ function initPeerJS() {
     peer.on("open", (id) => {
         peer.id = peer.id || lastPeerId;
         lastPeerId = peer.id;
-        
+
         if (ytr_debug)
             ytrlog(`Peer ID: ${peer.id}`);
     });
@@ -135,7 +150,6 @@ function initPeerJS() {
 
         conn = c;
         ytrlog("Connected to: " + conn.peer);
-
         connToast.showToast();
 
         // Reset metadata incase it has already been collected
@@ -162,11 +176,6 @@ function initPeerJS() {
                             document.getElementsByClassName("html5-video-player")[0].setVolume(message.vol);
                         }
                         break;
-                    // case "load":
-                    //  // Would be super cool to load yt from another device.
-                    //  // video ID Only (to stop full redirects to other sites) and without page refresh
-                    //  // YT searching server side would be super cool (then they acc personal), send results to remote for choosing
-                    //  break;
                     default:
                         ytrlog(`Unknown message: ${data}`);
                         break;
@@ -272,14 +281,15 @@ const handleMetaDataChanges = () => {
                     title: navigator.mediaSession.metadata.title,
                     artist: navigator.mediaSession.metadata.artist,
                     artwork: base64Image
-                })); errorToast
+                }));
+                // Only update the latest data found once we have sent the data (client errors will break this rn)
+                lastMetaData = metaDataFound;
             })
-            .catch(error =>{
+            .catch(error => {
                 console.error(error);
                 errorToast.showToast();
-            } );
+            });
     }
-    lastMetaData = metaDataFound;
 }
 
 // Check every 2 sec for any changes that should be sent to the client
