@@ -4,6 +4,8 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById("version").innerHTML = `v${chrome.runtime.getManifest().version}`;
   document.title = `YouTube Remote v${chrome.runtime.getManifest().version}`;
 
+  const versionElement = document.getElementById("version").innerHTML;
+
   chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
     if (tabs.length && tabs[0].url.includes('youtube.com')) {
       chrome.tabs.sendMessage(tabs[0].id, { action: 'getID' }, (response) => {
@@ -25,37 +27,106 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
+  // Implemented a local storage trigger for the ui Toggle 
+  const toggleElement = document.getElementById('local-connection-toggle');
+  
+  const toggleLabel = toggleElement ? toggleElement.nextElementSibling : null;
+
+  // Display extension version
+  if (versionElement) {
+    versionElement.innerHTML = `v${chrome.runtime.getManifest().version}`;
+    document.title = `YouTube Remote v${chrome.runtime.getManifest().version}`;
+  }
+
+  // Initialise the toggle switch state based on local storage
+  if (toggleElement) {
+    readFromLocalStorage('YTRemote_isLocalConnectionOnly').then((value) => {
+      toggleElement.checked = (value === 'true');
+      updateToggleSwitchUI(toggleElement, toggleLabel);
+
+      if (value === 'true') {
+        console.log("[Youtube Remote] Local Connection Only mode is active.");
+      } else if (value === 'false')
+      {
+        console.log("[Youtube Remote] Local Connection Only mode is inactive.");
+      }
+    }).catch((error) => {
+      console.error("Error reading from local storage:", error);
+    });
+
+    // Add listener for toggle switch changes
+    toggleElement.addEventListener('change', (event) => {
+      const isChecked = event.target.checked;
+      writeToLocalStorage('YTRemote_isLocalConnectionOnly', isChecked.toString()).then(() => {
+        updateToggleSwitchUI(toggleElement, toggleLabel);
+        
+        if (isChecked) {
+          console.log("[Youtube Remote] Local Connection Only mode is active.");
+        } else if (!isChecked)
+        {
+          console.log("[Youtube Remote] Local Connection Only mode is inactive.");
+        }
+
+      }).catch((error) => {
+        console.error("Error writing to local storage:", error);
+      });
+    });
+  } else {
+    console.error("Toggle element not found.");
+  }
+
   document.getElementById('open-options').addEventListener('click', () => {
     chrome.runtime.openOptionsPage();
   });
 });
 
+
 // TODO:
-// - Read/Write YTRemote_isLocalConnectionOnly from local storage
-// - Create toggle to effect this value in popup.html
+// - Read/Write YTRemote_isLocalConnectionOnly from local storage (done)
+// - Create toggle to effect this value in popup.html (done)
 // - Create listeners in yt_remote and options for if this value changes
 
+
+// Read from local storage
 const readFromLocalStorage = (key) => {
   return new Promise((resolve, reject) => {
-      try {
-          const value = localStorage.getItem(key);
-          resolve(value);
-      } catch (error) {
-          reject(error);
-      }
+    try {
+      const value = localStorage.getItem(key);
+      resolve(value);
+    } catch (error) {
+      reject(error);
+    }
   });
 };
 
+// Write to local storage
 const writeToLocalStorage = (key, value) => {
   return new Promise((resolve, reject) => {
-      try {
-          localStorage.setItem(key, value);
-          resolve();
-      } catch (error) {
-          reject(error);
-      }
+    try {
+      localStorage.setItem(key, value);
+      resolve();
+    } catch (error) {
+      reject(error);
+    }
   });
 };
+
+// Update the toggle switch UI
+const updateToggleSwitchUI = (toggleElement, toggleLabel) => {
+  if (toggleLabel) {
+    const isChecked = toggleElement.checked;
+    if (isChecked) {
+      toggleLabel.querySelector('div').classList.replace('bg-zinc-800', 'bg-zinc-600');
+      toggleLabel.querySelector('span').classList.replace('translate-x-0', 'translate-x-5');
+      toggleLabel.querySelector('span').classList.replace('bg-zinc-700', 'bg-zinc-500');
+    } else {
+      toggleLabel.querySelector('div').classList.replace('bg-zinc-600', 'bg-zinc-800');
+      toggleLabel.querySelector('span').classList.replace('translate-x-5', 'translate-x-0');
+      toggleLabel.querySelector('span').classList.replace('bg-zinc-500', 'bg-zinc-700');
+    }
+  }
+};
+
 
 // tailwindcss 3.4.5
 (() => {

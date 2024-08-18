@@ -223,7 +223,7 @@ document.addEventListener('DOMContentLoaded', () => {
   pauseButton.addEventListener('click', () => {
     // Ping pong the play/pause stated
     pauseButton.dataset.state = (pauseButton.dataset.state === 'playing') ? 'paused' : 'playing';
-    updateButtonUI()
+    updateButtonUI();
   });
 
   // Change all references to the version to load from the manifest file
