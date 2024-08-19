@@ -22,25 +22,27 @@
         <p class="text-lg font-bold text-slate-100/80">Youtube Remote</p>
         <b id="version" class="text-xs text-slate-100/30 font"></b>
     </div>
+    <!-- PeerJS ID info -->
     <div class="mb-1 flex items-center group w-full" id="peer-id">
-        <div class="h-[28px] mr-2 text-slate-100/60 py-[4px] px-4 rounded-md border border-white/10">
+        <div style="height: 32px;"
+            class="h-[28px] mr-2 text-slate-100/60 py-[4px] px-4 rounded-md border border-white/10">
             ID:</div>
-        <div id="id"
+        <div id="id" style="height: 32px;"
             class="h-[28px] group-hover:text-white text-slate-100 py-[4px] px-2 rounded-md border border-white/10 transition w-full">
         </div>
     </div>
-    <!-- Toggle switch for Local Connection Only -->
-    <div class="mb-4 flex items-center w-full">
-        <input type="checkbox" id="local-connection-toggle" class="sr-only">
+    <!-- Toggle switch for Local Connection -->
+    <div class="mb-4 flex items-center w-full" id="local-connection-toggle">
+        <input type="checkbox" class="sr-only">
         <label for="local-connection-toggle" class="relative inline-flex items-center cursor-pointer mr-2">
             <div class="w-[49px] h-[28px] bg-zinc-800 rounded-md transition-colors duration-200 ease-in-out"></div>
             <span
                 class="absolute left-[2px] w-6 h-5 bg-zinc-700 transition-all rounded-md duration-200 ease-in-out transform translate-x-0"></span>
         </label>
-        <div class="h-[28px] group-hover:text-white text-slate-100 py-[4px] px-2 rounded-md border border-white/10 transition w-full">
+        <div style="height: 32px;"
+            class="h-[28px] group-hover:text-white text-slate-100 py-[4px] px-2 rounded-md border border-white/10 transition w-full">
             <label class="text-gray-400 ">Local Connection</label>
         </div>
-        
     </div>
     <button
         class="w-full text-slate-100/60 py-2 px-4 rounded flex-1 backdrop-blur-lg font-bold border border-white/10 shadow-sm hover:ring-1 hover:ring-white/10 transition text-nowrap hover:text-white/90"

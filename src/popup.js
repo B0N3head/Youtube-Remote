@@ -19,7 +19,7 @@ document.addEventListener('DOMContentLoaded', () => {
       chrome.tabs.sendMessage(tabs[0].id, { action: 'getID' }, (response) => {
         // Suppress throwing "Unchecked runtime.lastError" if the tab isn't ready
         if (chrome.runtime.lastError)
-          ytrlog(" Tab not ready");
+          ytrlog("Tab not ready");
 
         const idElement = document.getElementById('id');
         if (response) {
@@ -31,7 +31,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
       });
     } else {
-      document.getElementById('id').textContent = 'Site not supported D:';
+      document.getElementById('id').textContent = 'Site not supported';
     }
   });
 
