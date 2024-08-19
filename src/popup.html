@@ -8,11 +8,18 @@
         body {
             font-family: Arial, sans-serif;
             background-color: #1e1e1f;
-            width: 235px;
+            width: 255px;
         }
 
         #peer-id {
             margin-bottom: 10px;
+        }
+
+        .fireFix {
+            height: 28px;
+            font-size: 12px;
+            padding-top: 4px;
+            padding-bottom: 4px;
         }
     </style>
 </head>
@@ -24,28 +31,27 @@
     </div>
     <!-- PeerJS ID info -->
     <div class="mb-1 flex items-center group w-full" id="peer-id">
-        <div style="height: 32px;"
-            class="h-[28px] mr-2 text-slate-100/60 py-[4px] px-4 rounded-md border border-white/10">
+        <div class="fireFix h-[28px] mr-2 text-slate-100/60 py-[4px] px-4 rounded-md border border-white/10">
             ID:</div>
-        <div id="id" style="height: 32px;"
-            class="h-[28px] group-hover:text-white text-slate-100 py-[4px] px-2 rounded-md border border-white/10 transition w-full">
+        <div id="id" style="height: 28px;"
+            class="fireFix h-[28px] group-hover:text-white text-slate-100 py-[4px] px-2 rounded-md border border-white/10 transition w-full">
         </div>
     </div>
     <!-- Toggle switch for Local Connection -->
-    <div class="mb-4 flex items-center w-full" id="local-connection-toggle">
-        <input type="checkbox" class="sr-only">
-        <label for="local-connection-toggle" class="relative inline-flex items-center cursor-pointer mr-2">
+    <div class="mb-4 flex items-center w-full">
+        <input id="localConnectionToggle" type="checkbox" class="sr-only">
+        <label for="localConnectionToggle" class="relative inline-flex items-center cursor-pointer mr-2">
             <div class="w-[49px] h-[28px] bg-zinc-800 rounded-md transition-colors duration-200 ease-in-out"></div>
-            <span
-                class="absolute left-[2px] w-6 h-5 bg-zinc-700 transition-all rounded-md duration-200 ease-in-out transform translate-x-0"></span>
+            <span style="background-color: #63a757"
+                class="absolute left-[2px] w-6 h-5 transition-all rounded-md duration-200 ease-in-out transform translate-x-0"></span>
         </label>
-        <div style="height: 32px;"
-            class="h-[28px] group-hover:text-white text-slate-100 py-[4px] px-2 rounded-md border border-white/10 transition w-full">
-            <label class="text-gray-400 ">Local Connection</label>
+        <div
+            class="fireFix h-[28px] group-hover:text-white text-slate-100 py-[4px] px-2 rounded-md border border-white/10 transition w-full">
+            <label id="localConnectionText" class="text-gray-400 ">Only Local Connections</label>
         </div>
     </div>
     <button
-        class="w-full text-slate-100/60 py-2 px-4 rounded flex-1 backdrop-blur-lg font-bold border border-white/10 shadow-sm hover:ring-1 hover:ring-white/10 transition text-nowrap hover:text-white/90"
+        class="w-full text-yellow-400 py-2 px-4 rounded flex-1 backdrop-blur-lg font-bold border border-white/10 shadow-sm hover:ring-1 hover:ring-white/10 transition text-nowrap hover:text-white/90"
         id="open-options">Open Control Panel</button>
     <script src="popup.js"></script>
 </body>

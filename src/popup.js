@@ -1,18 +1,20 @@
-const ytrVersion =chrome.runtime.getManifest().version;
+const ytrVersion = chrome.runtime.getManifest().version;
 console.log(`[Youtube Remote v${ytrVersion}]`);
 
+const ytrDebug = true;
 const ytrlog = (message) => ytrDebug && console.log(`[Youtube Remote] ${message}`);
 
+const versionElement = document.getElementById("version");
+const localConnToggle = document.getElementById('localConnectionToggle'); // Local storage trigger for the ui Toggle 
+const localConnText = document.getElementById('localConnectionText'); // Local storage trigger for the ui Toggle 
+const idElement = document.getElementById('id');
+
 document.addEventListener('DOMContentLoaded', () => {
-  const versionElement = document.getElementById("version");
-  const toggleElement = document.getElementById('local-connection-toggle'); // Local storage trigger for the ui Toggle 
-  const toggleLabel = toggleElement ? toggleElement.nextElementSibling : null;
+  const toggleLabel = localConnToggle ? localConnToggle.nextElementSibling : null;
 
   // Update extension version
-  if (versionElement) {
-    versionElement.innerHTML = `v${ytrVersion}`;
-    document.title = `YouTube Remote v${ytrVersion}`;
-  }
+  versionElement.innerHTML = `v${ytrVersion}`;
+  document.title = `YouTube Remote v${ytrVersion}`;
 
   chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
     if (tabs.length && tabs[0].url.includes('youtube.com')) {
@@ -21,13 +23,12 @@ document.addEventListener('DOMContentLoaded', () => {
         if (chrome.runtime.lastError)
           ytrlog("Tab not ready");
 
-        const idElement = document.getElementById('id');
         if (response) {
           idElement.textContent = response.peerID;
-          idElement.className = "h-[28px] group-hover:text-white text-yellow-400 py-[4px] px-2 rounded-md border border-white/10 transition w-full";
+          writeToLocalStorage({ YTRemoteLastDisplayedKey: response.peerID });
+          idElement.classList.replace('text-slate-100', 'text-yellow-400');
         } else {
           idElement.textContent = 'Please reopen';
-          idElement.className = "h-[28px] group-hover:text-white text-slate-100 py-[4px] px-2 rounded-md border border-white/10 transition w-full";
         }
       });
     } else {
@@ -36,56 +37,37 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   // Initialise the toggle switch state based on local storage
-  if (toggleElement) {
-    readFromLocalStorage('YTRemote_isLocalConnectionOnly').then((value) => {
-      toggleElement.checked = (value === 'true');
-      updateToggleSwitchUI(toggleElement.checked, toggleLabel);
-      ytrlog(`Connection mode is: ${toggleElement.checked ? "local" : "global"}`);
-    }).catch((error) => {
-      console.error("Error reading from local storage:", error);
-    });
+  chrome.storage.local.get(['YTRemoteIsLocalConnectionOnly']).then((value) => {
+    localConnToggle.checked = value.YTRemoteIsLocalConnectionOnly;
+    updateToggleSwitchUI(localConnToggle.checked, toggleLabel);
+    ytrlog(`Connection mode is: ${localConnToggle.checked ? "global" : "local"}`);
+  }).catch((error) => {
+    console.error("Error reading from local storage:", error);
+  });
 
-    // Add listener for toggle switch changes
-    toggleElement.addEventListener('change', (event) => {
-      const isChecked = event.target.checked;
-      writeToLocalStorage('YTRemote_isLocalConnectionOnly', isChecked.toString()).then(() => {
-        updateToggleSwitchUI(toggleElement, toggleLabel);
-        // Can never be null as its added to toggleElement at runtime (won't be added if it can't be found)
-        ytrlog(`Connection mode is: ${isChecked ? "local" : "global"}`);
-      }).catch((error) => {
-        console.error("Error writing to local storage:", error);
-      });
+  // Add listener for toggle switch changes
+  localConnToggle.addEventListener('change', (event) => {
+    const isChecked = event.target.checked;
+    writeToLocalStorage({ YTRemoteIsLocalConnectionOnly: isChecked }).then(() => {
+      updateToggleSwitchUI(localConnToggle.checked, toggleLabel);
+      // Can never be null as its added to toggleElement at runtime (won't be added if it can't be found)
+      ytrlog(`Connection mode is: ${isChecked ? "global" : "local"}`);
+    }).catch((error) => {
+      console.error("Error writing to local storage:", error);
     });
-  } else {
-    console.error("Toggle element not found.");
-  }
+  });
 
   document.getElementById('open-options').addEventListener('click', () => {
     chrome.runtime.openOptionsPage();
   });
 });
 
-// TODO:
-// - Create listeners in yt_remote and options for if this value changes
-
-// Read from local storage
-const readFromLocalStorage = (key) => {
+const writeToLocalStorage = (data) => {
   return new Promise((resolve, reject) => {
     try {
-      const value = localStorage.getItem(key);
-      resolve(value);
-    } catch (error) {
-      reject(error);
-    }
-  });
-};
-
-// Write to local storage
-const writeToLocalStorage = (key, value) => {
-  return new Promise((resolve, reject) => {
-    try {
-      localStorage.setItem(key, value);
-      resolve();
+      chrome.storage.local.set(data).then(() => {
+        resolve();
+      });
     } catch (error) {
       reject(error);
     }
@@ -93,21 +75,17 @@ const writeToLocalStorage = (key, value) => {
 };
 
 // Update the toggle switch UI
-const updateToggleSwitchUI = (toggleElement, toggleLabel) => {
-  if (toggleLabel) {
-    const isChecked = toggleElement.checked;
-    if (isChecked) {
-      toggleLabel.querySelector('div').classList.replace('bg-zinc-800', 'bg-zinc-600');
-      toggleLabel.querySelector('span').classList.replace('translate-x-0', 'translate-x-5');
-      toggleLabel.querySelector('span').classList.replace('bg-zinc-700', 'bg-zinc-500');
-    } else {
-      toggleLabel.querySelector('div').classList.replace('bg-zinc-600', 'bg-zinc-800');
-      toggleLabel.querySelector('span').classList.replace('translate-x-5', 'translate-x-0');
-      toggleLabel.querySelector('span').classList.replace('bg-zinc-500', 'bg-zinc-700');
-    }
+const updateToggleSwitchUI = (toggled, toggleLabel) => {
+  if (toggled) {
+    toggleLabel.querySelector('span').classList.replace('translate-x-0', 'translate-x-5');
+    toggleLabel.querySelector('span').style.background = "#af3939";
+    localConnText.innerHTML = "Global Connections Allowed";
+  } else {
+    toggleLabel.querySelector('span').classList.replace('translate-x-5', 'translate-x-0');
+    toggleLabel.querySelector('span').style.background = "#63a757";
+    localConnText.innerHTML = "Only Local Connections";
   }
 };
-
 
 // tailwindcss 3.4.5
 (() => {

@@ -1,6 +1,5 @@
 // Compatible with YouTube NonStop 0.9.2
 // Thx lawfx for the awesome extension and inspiration to make this <3
-
 console.log(`[Youtube Remote v${chrome.runtime.getManifest().version}]`);
 
 // "inject" Toastify css 1.12.0
@@ -15,19 +14,39 @@ const scriptInject = (_script, _className) => {
         if (_className)
             script.className = _className;
         script.addEventListener('load', resolve);
-        script.addEventListener('error', e => reject(e.error));
+        script.addEventListener('error', e => reject(e.error, _className));
         (document.documentElement).appendChild(script);
     });
 }
 
+const notifyRemote = () => {
+    chrome.storage.local.get(['YTRemoteIsLocalConnectionOnly']).then((value) => {
+        console.log(value);
+        if (Object.keys(value).length == 1)
+            window.postMessage({ type: "ytrGlobalResponse", info: value.YTRemoteIsLocalConnectionOnly });
+        else // Do not allow remote connections if the value has never been set
+            window.postMessage({ type: "ytrGlobalResponse", info: false });
+    });
+}
+
+chrome.storage.local.onChanged.addListener(notifyRemote); // Fires notifyRemote on change
+window.addEventListener("message", (event) => { // Fires on ytRemote request
+    if (event.source !== window) return;
+    if (event.data.type && event.data.type === "ytrGlobalRequest")
+        notifyRemote();
+});
+
+// INJECT ALL THE SCRIPTS
 scriptInject(chrome.runtime.getURL('libs/toastifyjs.js'), "toastifyjs").then(() => {
-    scriptInject(chrome.runtime.getURL('libs/peerjs.js'), "peerjs").then(() => {
-        scriptInject(chrome.runtime.getURL('libs/ytRemote.js'), "ytremotescript").then(() => {
-            // Watch for our popup.js to call for our ID (only run if we have injected ytRemote)
-            chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-                if (message.action === 'getID')
-                    sendResponse({ peerID: document.getElementsByClassName("ytremotescript")[0].id.toUpperCase() });
-            });
-        }).catch(error => console.error(error));
-    }).catch(error => console.error(error));
-}).catch(error => console.error(error));
+    scriptInject(chrome.runtime.getURL('libs/md5.js'), "peerjs").then(() => {
+        scriptInject(chrome.runtime.getURL('libs/peerjs.js'), "peerjs").then(() => {
+            scriptInject(chrome.runtime.getURL('libs/ytRemote.js'), "ytremotescript").then(() => {
+                // Watch for our popup.js to call for our ID (only run if we have injected ytRemote)
+                chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+                    if (message.action === 'getID')
+                        sendResponse({ peerID: document.getElementsByClassName("ytremotescript")[0].id.toUpperCase() });
+                });
+            }).catch(error => console.error(`${_className} failed to inject into page:\n${error}`));
+        }).catch(error => console.error(`${_className} failed to inject into page:\n${error}`));
+    }).catch(error => console.error(`${_className} failed to inject into page:\n${error}`));
+}).catch(error => console.error(`${_className} failed to inject into page:\n${error}`));

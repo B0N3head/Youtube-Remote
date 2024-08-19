@@ -1,8 +1,8 @@
 {
   "name": "YouTube Remote",
   "short_name": "YT Remote",
-  "version": "2.0.0",
-  "description": "Control Youtube clients on any network",
+  "version": "2.0.1",
+  "description": "Control Youtube clients on any network!!!",
   "host_permissions": [
     "https://api.ipify.org/"
   ],
