@@ -1,7 +1,7 @@
 const isYTMusic = window.location.hostname === "music.youtube.com";
 const scriptSelf = document.getElementsByClassName("ytremotescript")[0];
 const chars = "abcdefghjklmnopqrstuvwxyz";
-const ytrDebug = false;
+let ytrDebug = false;
 
 let youtubeNonStop = false;
 let nextButton, prevButton, pauseButton, muteButton, volumeSlider,
@@ -84,10 +84,10 @@ const pauseSong = () => {
     if (youtubeNonStop) lastInteractionTime = new Date().getTime();
     pauseButton.click();
 
-    // YT and YTM will not autoplay sometimes in firefox. .click() only updates UI and doesn't trigger media playback
+    // YT and YTM will not autoplay sometimes in firefox .click() only updates UI and doesn't trigger media playback
     // Will need to look further into this
 
-    // // If we were paused 500ms ago and still are then it must be a fresh yt page waiting for the init click
+    // // If we were paused 500ms ago and are still paused, then it must be a fresh yt page waiting for the init click
     // setTimeout(() => {
     //     if ((navigator.mediaSession.playbackState != "playing") && currentPlayState)
     //         document.getElementById(isYTMusic ? "song-media-window" : "movie_player").click();
@@ -108,6 +108,7 @@ let peer = null;
 let conn = null;
 
 const refuseConnection = (c, m) => {
+    ytrLog("Refusing connection from: " + c.peer);
     c.on("open", () => {
         c.send(JSON.stringify({ type: "reject", value: m ? m : null }));
         setTimeout(() => c.close(), 500);
@@ -122,7 +123,6 @@ const setupConnection = (c) => {
     // Reset metadata incase it has already been collected
     lastMetaData = null;
     setTimeout(() => handleMediaChanges(true), 1000);    // Force
-
 
     conn.on("data", (data) => {
         try {

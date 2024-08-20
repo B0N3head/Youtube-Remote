@@ -24,9 +24,9 @@ let lastSuccessUNIX = 0;
 const waitIconElement = document.getElementById("waitIcon");
 const readyIconElement = document.getElementById("readyIcon");
 const creditsElement = document.getElementById("mainCredits");
-const ytrDebug = false;
+let ytrDebug = false;
 
-const ytrLog = (message, error) => ytrDebug && error ? console.error(`[Youtube Remote] ${message}`, error) : console.log(`[Youtube Remote] ${message}`);
+const ytrLog = (message, err) => ytrDebug && (err ? console.error(`[Youtube Remote] ${message}`, err) : console.log(`[Youtube Remote] ${message}`));
 
 const sendPeerData = (data) => conn && conn.open ? (conn.send(data), ytrLog(data)) : ytrLog("Connection is closed");
 
@@ -39,8 +39,8 @@ const runOnLoad = () => {
       chrome.storage.local.get(['YTRemoteLastDisplayedKey']).then((lastDisplayed) => {
         if (Object.keys(lastDisplayed).length == 1)
           idInputElement.value = lastDisplayed.YTRemoteLastDisplayedKey;
-      }).catch((error) => ytrLog("Something went wrong accessing LastDisplayedKey", error));
-  }).catch((error) => ytrLog("Something went wrong accessing LastUsedKey", error));
+      }).catch((err) => ytrLog("Something went wrong accessing LastDisplayedKey", err));
+  }).catch((err) => ytrLog("Something went wrong accessing LastUsedKey", err));
 
   // -------- PeerJS --------
   peer = new Peer({
@@ -128,6 +128,14 @@ const runOnLoad = () => {
 
     // Attempt to connect
     conn = peer.connect(idInputElement.value.toLowerCase(), { metadata: { localID: hashedIP }, reliable: true });
+    currentUNIX = 0;
+    setTimeout(() => {
+      if (currentUNIX == 0){
+        statusText.innerHTML = `Could not find ${conn.peer.toUpperCase()} :(`; 
+        resetUI(); 
+        conn=null;
+      }
+    }, 5000);
 
     // Lets tell the user we connected successfully 
     conn.on("open", () => {
@@ -170,24 +178,26 @@ const runOnLoad = () => {
             lastSuccessUNIX = Math.floor(Date.now() / 1000);
             statusText.innerHTML = "Connected to: " + conn.peer.toUpperCase();
             break;
-          case "reject": // Our request has been politely declined :(            
+          case "reject": // Our request has been politely declined :(    
+            lastSuccessUNIX = 1;
             statusText.innerHTML = connDataJson.value ? `Server is not accepting connections :(<br>${connDataJson.value}` : "Server is not accepting connections :(";
             break;
           case "ping":
             sendPeerData(JSON.stringify({ type: "pong", id: peer.id }));
             break;
           default:
-            ytrLog(`Unknown data ${error}`);
+            ytrLog(`Unknown data ${data}`);
         }
-      } catch (error) {
-        ytrLog(`Error parsing data: ${error}`);
+      } catch (err) {
+        ytrLog(`Error parsing data: ${err}`);
       }
     });
 
     conn.on("close", () => {
       // If our last successful connection is older than 10 sec
       if ((Math.floor(Date.now() / 1000) - lastSuccessUNIX) > 10) {
-        statusText.innerHTML = "Connection closed";
+        if (lastSuccessUNIX != 1)
+          statusText.innerHTML = "Connection closed";
         setTimeout(() => { statusText.innerHTML = "Ready"; resetUI(); }, 4000);
         conn = null;
       }
@@ -270,7 +280,7 @@ const attemptIpHash = () => {
       hashedIP = md5(data.ip);
       clearInterval(ipChecker);
     })
-    .catch(error => {
+    .catch(err => {
       ytrLog("Could not generate hashed IP")
     });
 }
@@ -305,8 +315,8 @@ const writeToLocalStorage = (data) => {
       chrome.storage.local.set(data).then(() => {
         resolve();
       });
-    } catch (error) {
-      reject(error);
+    } catch (err) {
+      reject(err);
     }
   });
 };
@@ -525,6 +535,6 @@ document.addEventListener("DOMContentLoaded", () => {
     scriptInject(chrome.runtime.getURL("libs/peerjs.js"), "peerjs").then(() => {
       ipChecker = setInterval(attemptIpHash, 2000);
       runOnLoad();
-    }).catch(error => console.error(error));
-  }).catch(error => console.error(error));
+    }).catch(err => console.error(err));
+  }).catch(err => console.error(err));
 });
