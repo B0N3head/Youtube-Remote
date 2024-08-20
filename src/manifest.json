@@ -4,7 +4,12 @@
   "version": "2.0.1",
   "description": "Control Youtube clients on any network!!!",
   "host_permissions": [
-    "https://api.ipify.org/"
+    "https://api.ipify.org/",
+    "https://i.ytimg.com/",
+    "https://img.youtube.com/",
+    "https://i3.ytimg.com/",
+    "https://yt3.ggpht.com/",
+    "https://lh3.googleusercontent.com/"
   ],
   "permissions": [
     "tabs",

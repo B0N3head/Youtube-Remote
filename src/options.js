@@ -18,7 +18,7 @@ const prevButton = document.getElementById("prevButton");
 const volumeSlider = document.getElementById("volumeSlide");
 
 // Misc
-let ipChecker, hashedIP;
+let ipChecker, hashedIP, serverIsMuted;
 let currentUNIX = 0;
 const waitIconElement = document.getElementById("waitIcon");
 const readyIconElement = document.getElementById("readyIcon");
@@ -41,37 +41,15 @@ const runOnLoad = () => {
       }).catch((error) => ytrLog("Something went wrong accessing LastDisplayedKey", error));
   }).catch((error) => ytrLog("Something went wrong accessing LastUsedKey", error));
 
-  // -------- Misc --------
-  const showLoading = (loading) => {
-    isLoading = loading;
-    if (loading) {
-      connectText.innerHTML = "Please Wait";
-      waitIconElement.style.display = "block";
-      readyIconElement.style.display = "none";
-    }
-    else {
-      connectText.innerHTML = "Connect";
-      waitIconElement.style.display = "none";
-      readyIconElement.style.display = "block";
-    }
-  }
-
-  const updateButtonUI = () => {
-    pauseButton.innerHTML = pauseButton.dataset.state === "playing"
-      ? `<div class="flex justify-center items-center">
-                <svg fill="none" viewBox="0 0 24 24" stroke-width="3" stroke="currentColor" class="size-8 stroke-white stroke-white/50 group-hover:stroke-white/20 transition">
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 5.25v13.5m-7.5-13.5v13.5" />
-                </svg>
-              </div>`
-      : `<div class="flex justify-center items-center">
-                <svg fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-8 stroke-white/20 group-hover:stroke-white/50 transition">
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.347a1.125 1.125 0 0 1 0 1.972l-11.54 6.347a1.125 1.125 0 0 1-1.667-.986V5.653Z" />
-                </svg>
-              </div>`;
-  }
-
   // -------- PeerJS --------
-  peer = new Peer();
+  peer = new Peer({
+    config: {
+      'iceServers': [
+        { url: 'stun:stun.l.google.com:19302' },
+        { url: 'turn:turn.bistri.com:80', credential: 'homeo', username: 'homeo' }
+      ]
+    }
+  });
   // Create our peerJS client
   peer.on("open", (id) => {
     peer.id = peer.id || lastPeerId;
@@ -113,7 +91,6 @@ const runOnLoad = () => {
 
   // Log all errors (to debug) but show the ones that revolve around crappy user input
   peer.on("error", function (err) {
-    console.log(JSON.stringify(err));
     switch (err.type) {
       case "browser-incompatible":
         alert("Your browser does not support WebRTC\nPlease disable any blocking extensions and/or check that your browser supports WebRTC");
@@ -149,7 +126,7 @@ const runOnLoad = () => {
     statusText.innerHTML = "Attempting to connect...";
 
     // Attempt to connect
-    conn = peer.connect(idInputElement.value.toLowerCase(), { metadata: { local: hashedIP }, reliable: true });
+    conn = peer.connect(idInputElement.value.toLowerCase(), { metadata: { localID: hashedIP }, reliable: true });
 
     // Lets tell the user we connected successfully 
     conn.on("open", () => {
@@ -161,13 +138,14 @@ const runOnLoad = () => {
     // Handle incoming data (messages only since this is the signal sender)
     conn.on("data", (data) => {
       try {
-        console.log(data) 
+        console.log(data)
         // Used for checking client pulse (no pong as the ping would error + we don"t care about latency)
         const connDataJson = JSON.parse(data);
         switch (connDataJson.type) {
           case "meta": // Metadata from song change
-            if (connDataJson.time < currentUNIX) // Is this data old???
+            if (connDataJson.time < currentUNIX) // This data is old???
               return;
+
             // Update media metadata
             currentUNIX = connDataJson.time;
             htmlTitle.innerHTML = connDataJson.title;
@@ -175,19 +153,23 @@ const runOnLoad = () => {
             if (connDataJson.artwork != null)
               htmlArtwork.src = connDataJson.artwork;
             break;
-          case "play": // If the server has messed with the player state, then we send updates to the client in an attempt to keep them synced
-            pauseButton.dataset.state = connDataJson.value ? "playing" : "paused";
-            updateButtonUI();
+          case "mediaControl": // If the server has messed with the player state, then we send updates to the client in an attempt to keep them synced
+            if (connDataJson.play) {
+              pauseButton.dataset.state = connDataJson.play ? "playing" : "paused";
+              updateButtonUI();
+            }
+            if (connDataJson.mute) {
+              serverIsMuted = connDataJson.mute;
+              volumeSlide.value = 0;
+            }
+            if (connDataJson.volume && !serverIsMuted) // Don't change volume if server is currently muted
+              volumeSlide.value = connDataJson.volume;
             break;
-          case "mute":
-            pauseButton.dataset.state = connDataJson.value ? "playing" : "paused";
-            updateButtonUI();
-            break;
-          case "accept": // Our request has been politely declined :(
+          case "accept":
             statusText.innerHTML = "Connected to: " + conn.peer.toUpperCase();
             break;
-          case "reject": // Our request has been politely declined :(
-            statusText.innerHTML = "Someone else is already connected :(";
+          case "reject": // Our request has been politely declined :(            
+            statusText.innerHTML = connDataJson.value ? `Server is not accepting connections :(<br>${connDataJson.value}` : "Server is not accepting connections :(";
             break;
           case "ping":
             sendPeerData(JSON.stringify({ type: "pong", id: peer.id }));
@@ -201,10 +183,8 @@ const runOnLoad = () => {
     });
 
     conn.on("close", () => {
-      if (!statusText.innerHTML.startsWith("Someone"))
-        statusText.innerHTML = "Connection closed";
-      setTimeout(() => { statusText.innerHTML = "Ready"; }, 1500);
-      showLoading(false);
+      statusText.innerHTML = "Connection closed";
+      setTimeout(() => { statusText.innerHTML = "Ready"; resetUI(); }, 4000);
     });
   });
 
@@ -220,7 +200,6 @@ const runOnLoad = () => {
     sendPeerData(JSON.stringify({ type: "vol", vol: volume }));
   });
 
-  const toggleCredits = () => creditsElement.style.display = creditsElement.style.display == "block" ? "none" : "block";
   document.getElementById("closeCredits").addEventListener("click", toggleCredits);
   document.getElementById("creditsShow").addEventListener("click", toggleCredits);
 
@@ -247,7 +226,37 @@ const runOnLoad = () => {
   document.title = `YouTube Remote v${chrome.runtime.getManifest().version}`;
 }
 
-// Helper functions
+// -------- Misc --------
+const showLoading = (loading) => {
+  isLoading = loading;
+  if (loading) {
+    connectText.innerHTML = "Please Wait";
+    waitIconElement.style.display = "block";
+    readyIconElement.style.display = "none";
+  }
+  else {
+    connectText.innerHTML = "Connect";
+    waitIconElement.style.display = "none";
+    readyIconElement.style.display = "block";
+  }
+}
+
+const toggleCredits = () => creditsElement.style.display = creditsElement.style.display == "block" ? "none" : "block";
+
+const updateButtonUI = () => {
+  pauseButton.innerHTML = pauseButton.dataset.state === "playing"
+    ? `<div class="flex justify-center items-center">
+                <svg fill="none" viewBox="0 0 24 24" stroke-width="3" stroke="currentColor" class="size-8 stroke-white stroke-white/50 group-hover:stroke-white/20 transition">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 5.25v13.5m-7.5-13.5v13.5" />
+                </svg>
+              </div>`
+    : `<div class="flex justify-center items-center">
+                <svg fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-8 stroke-white/20 group-hover:stroke-white/50 transition">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.347a1.125 1.125 0 0 1 0 1.972l-11.54 6.347a1.125 1.125 0 0 1-1.667-.986V5.653Z" />
+                </svg>
+              </div>`;
+}
+
 const attemptIpHash = () => {
   fetch("https://api.ipify.org?format=json")
     .then(response => response.json())
@@ -263,6 +272,13 @@ const attemptIpHash = () => {
 const simulateMobile = () => {
   peer = null;
   conn = null;
+}
+
+const resetUI = () => {
+  showLoading(false);
+  htmlTitle.innerHTML = "Nothing";
+  htmlArtist.innerHTML = "The silence is deafening";
+  htmlArtwork.src = "";
 }
 
 const scriptInject = (_script, _className) => {
@@ -497,7 +513,6 @@ Check your Browserslist config to be sure that your targets are set up correctly
     } rb.exports = sr; function sr(...i) { let e; if (i.length === 1 && dO(i[0]) ? (e = i[0], i = void 0) : i.length === 0 || i.length === 1 && !i[0] ? i = void 0 : i.length <= 2 && (Array.isArray(i[0]) || !i[0]) ? (e = i[1], i = i[0]) : typeof i[i.length - 1] == "object" && (e = i.pop()), e || (e = {}), e.browser) throw new Error("Change `browser` option to `overrideBrowserslist` in Autoprefixer"); if (e.browserslist) throw new Error("Change `browserslist` option to `overrideBrowserslist` in Autoprefixer"); e.overrideBrowserslist ? i = e.overrideBrowserslist : e.browsers && (typeof console != "undefined" && console.warn && (Zl.red ? console.warn(Zl.red(tb.replace(/`[^`]+`/g, n => Zl.yellow(n.slice(1, -1))))) : console.warn(tb)), i = e.browsers); let t = { ignoreUnknownVersions: e.ignoreUnknownVersions, stats: e.stats, env: e.env }; function r(n) { let a = eb, s = new uO(a.browsers, i, n, t), o = s.selected.join(", ") + JSON.stringify(e); return eu.has(o) || eu.set(o, new fO(a.prefixes, s, e)), eu.get(o) } return { postcssPlugin: "autoprefixer", prepare(n) { let a = r({ from: n.opts.from, env: e.env }); return { OnceExit(s) { hO(n, a), e.remove !== !1 && a.processor.remove(s, n), e.add !== !1 && a.processor.add(s, n) } } }, info(n) { return n = n || {}, n.from = n.from || h.cwd(), pO(r(n)) }, options: e, browsers: i } } sr.postcss = !0; sr.data = eb; sr.defaults = oO.defaults; sr.info = () => sr().info()
   }); var nb = {}; _e(nb, { default: () => mO }); var mO, sb = C(() => { l(); mO = [] }); var ob = {}; _e(ob, { default: () => gO }); var ab, gO, lb = C(() => { l(); hi(); ab = X(bi()), gO = Ze(ab.default.theme) }); var fb = {}; _e(fb, { default: () => yO }); var ub, yO, cb = C(() => { l(); hi(); ub = X(bi()), yO = Ze(ub.default) }); l(); "use strict"; var wO = Je(pm()), bO = Je(ye()), vO = Je(ib()), xO = Je((sb(), nb)), kO = Je((lb(), ob)), SO = Je((cb(), fb)), CO = Je((Zn(), bu)), AO = Je((mo(), ho)), _O = Je((hs(), Ku)); function Je(i) { return i && i.__esModule ? i : { default: i } } var Hn = "tailwind", tu = "text/tailwindcss", pb = "/template.html", St, db = !0, hb = 0, ru = new Set, iu, mb = "", gb = (i = !1) => ({ get(e, t) { return (!i || t === "config") && typeof e[t] == "object" && e[t] !== null ? new Proxy(e[t], gb()) : e[t] }, set(e, t, r) { return e[t] = r, (!i || t === "config") && nu(!0), !0 } }); window[Hn] = new Proxy({ config: {}, defaultTheme: kO.default, defaultConfig: SO.default, colors: CO.default, plugin: AO.default, resolveConfig: _O.default }, gb(!0)); function yb(i) { iu.observe(i, { attributes: !0, attributeFilter: ["type"], characterData: !0, subtree: !0, childList: !0 }) } new MutationObserver(async i => { let e = !1; if (!iu) { iu = new MutationObserver(async () => await nu(!0)); for (let t of document.querySelectorAll(`style[type="${tu}"]`)) yb(t) } for (let t of i) for (let r of t.addedNodes) r.nodeType === 1 && r.tagName === "STYLE" && r.getAttribute("type") === tu && (yb(r), e = !0); await nu(e) }).observe(document.documentElement, { attributes: !0, attributeFilter: ["class"], childList: !0, subtree: !0 }); async function nu(i = !1) { i && (hb++, ru.clear()); let e = ""; for (let r of document.querySelectorAll(`style[type="${tu}"]`)) e += r.textContent; let t = new Set; for (let r of document.querySelectorAll("[class]")) for (let n of r.classList) ru.has(n) || t.add(n); if (document.body && (db || t.size > 0 || e !== mb || !St || !St.isConnected)) { for (let n of t) ru.add(n); db = !1, mb = e, self[pb] = Array.from(t).join(" "); let { css: r } = await (0, bO.default)([(0, wO.default)({ ...window[Hn].config, _hash: hb, content: { files: [pb], extract: { html: n => n.split(" ") } }, plugins: [...xO.default, ...Array.isArray(window[Hn].config.plugins) ? window[Hn].config.plugins : []] }), (0, vO.default)({ remove: !1 })]).process(`@tailwind base;@tailwind components;@tailwind utilities;${e}`); (!St || !St.isConnected) && (St = document.createElement("style"), document.head.append(St)), St.textContent = r } }
 })();
-
 
 document.addEventListener("DOMContentLoaded", () => {
   scriptInject(chrome.runtime.getURL("libs/md5.js"), "md5").then(() => {
