@@ -21,7 +21,6 @@ const scriptInject = (_script, _className) => {
 
 const notifyRemote = () => {
     chrome.storage.local.get(['YTRemoteIsLocalConnectionOnly']).then((value) => {
-        console.log(value);
         if (Object.keys(value).length == 1)
             window.postMessage({ type: "ytrGlobalResponse", info: value.YTRemoteIsLocalConnectionOnly });
         else // Do not allow remote connections if the value has never been set

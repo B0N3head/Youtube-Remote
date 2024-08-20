@@ -189,11 +189,11 @@ const initPeerJS = () => {
     });
 
     peer.on("connection", (c) => {
-        // Fix this crap plz 
-        console.log(hashedIP, c.metadata.local, `${c.metadata.id}` == `${hashedIP}`)
+        console.log(hashedIP, c.metadata.local, c.metadata.local == hashedIP);
         // If our hashed IP doesn't match the clients and we don't want global connections then refuse
+        console.log(allowGlobalConnections);
         if (c.metadata.local != hashedIP && !allowGlobalConnections) {
-            console.log("id doesn't match & no global");
+            console.log("id doesn't match & not allowing global con");
             refuseConnection(c);
             return;
         }
@@ -392,11 +392,8 @@ const attemptIpHash = () => {
 // Listen for messages from content script
 window.addEventListener("message", (event) => {
     if (event.source !== window) return;
-    if (event.data.type && event.data.type === "ytrGlobalResponse") {
+    if (event.data.type && event.data.type === "ytrGlobalResponse")
         allowGlobalConnections = event.data.info;
-        console.log("Message from content script:", event.data);
-        console.log("Messassipt:", allowGlobalConnections);
-    }
 });
 
 // Wait for the player controls to exist
