@@ -20,10 +20,11 @@ const volumeSlider = document.getElementById("volumeSlide");
 // Misc
 let ipChecker, hashedIP, serverIsMuted;
 let currentUNIX = 0;
+let lastSuccessUNIX = 0;
 const waitIconElement = document.getElementById("waitIcon");
 const readyIconElement = document.getElementById("readyIcon");
 const creditsElement = document.getElementById("mainCredits");
-const ytrDebug = true;
+const ytrDebug = false;
 
 const ytrLog = (message, error) => ytrDebug && error ? console.error(`[Youtube Remote] ${message}`, error) : console.log(`[Youtube Remote] ${message}`);
 
@@ -116,7 +117,7 @@ const runOnLoad = () => {
     showLoading(true);
 
     // Disconnect any old connections
-    if (conn) {
+    if (conn && conn.peer.toUpperCase() != idInputElement.value.toUpperCase()) {
       statusText.innerHTML = "Disconnecting...";
       conn.close();
       conn = null;
@@ -138,7 +139,7 @@ const runOnLoad = () => {
     // Handle incoming data (messages only since this is the signal sender)
     conn.on("data", (data) => {
       try {
-        console.log(data)
+        ytrLog(data);
         // Used for checking client pulse (no pong as the ping would error + we don"t care about latency)
         const connDataJson = JSON.parse(data);
         switch (connDataJson.type) {
@@ -166,6 +167,7 @@ const runOnLoad = () => {
               volumeSlide.value = connDataJson.volume;
             break;
           case "accept":
+            lastSuccessUNIX = Math.floor(Date.now() / 1000);
             statusText.innerHTML = "Connected to: " + conn.peer.toUpperCase();
             break;
           case "reject": // Our request has been politely declined :(            
@@ -183,8 +185,12 @@ const runOnLoad = () => {
     });
 
     conn.on("close", () => {
-      statusText.innerHTML = "Connection closed";
-      setTimeout(() => { statusText.innerHTML = "Ready"; resetUI(); }, 4000);
+      // If our last successful connection is older than 10 sec
+      if ((Math.floor(Date.now() / 1000) - lastSuccessUNIX) > 10) {
+        statusText.innerHTML = "Connection closed";
+        setTimeout(() => { statusText.innerHTML = "Ready"; resetUI(); }, 4000);
+        conn = null;
+      }
     });
   });
 
@@ -195,8 +201,8 @@ const runOnLoad = () => {
 
   volumeSlider.addEventListener("mouseup", () => {
     // easeInOutSine volume slider (desmos func bellow)
-    //-\frac{\left(\cos\left(0.01\pi x\right)-1\right)}{2}
-    const volume = volumeSlider.value != 0 ? -(Math.cos(Math.PI * 0.01 * volumeSlider.value) - 1) * 50 : volumeSlider.value;
+    //-\left(\cos\left(0.01\pi x\right)-1\right)*50
+    const volume = volumeSlider.value != 0 ? -(Math.cos(Math.PI * 0.01 * volumeSlider.value) - 1) * 50 : 0;
     sendPeerData(JSON.stringify({ type: "vol", vol: volume }));
   });
 

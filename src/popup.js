@@ -1,7 +1,7 @@
 const ytrVersion = chrome.runtime.getManifest().version;
 console.log(`[Youtube Remote v${ytrVersion}]`);
 
-const ytrDebug = true;
+const ytrDebug = false;
 const ytrlog = (message) => ytrDebug && console.log(`[Youtube Remote] ${message}`);
 
 const versionElement = document.getElementById("version");

@@ -1,7 +1,7 @@
 const isYTMusic = window.location.hostname === "music.youtube.com";
 const scriptSelf = document.getElementsByClassName("ytremotescript")[0];
 const chars = "abcdefghjklmnopqrstuvwxyz";
-const ytrDebug = true;
+const ytrDebug = false;
 
 let youtubeNonStop = false;
 let nextButton, prevButton, pauseButton, muteButton, volumeSlider,
@@ -282,31 +282,26 @@ const handleMediaChanges = (forced) => {
 
     // Check though metadata if currently paused
     const pauseFound = (navigator.mediaSession.playbackState == "playing")
-    if (forced || (pauseFound != lastPause && lastPause != null)) {
-        console.log("changed play state" + pauseFound);
+    if (forced || (pauseFound != lastPause && lastPause != null))
         mediaContData.play = pauseFound;
-    }
+
     lastPause = pauseFound;
 
     // Get the current value of the slider
     const foundVolume = volumeSlider.ariaValueNow;
-    if (forced || (foundVolume != lastVolume && lastVolume != null)) {
-        console.log("send volume" + foundVolume);
+    if (forced || (foundVolume != lastVolume && lastVolume != null))
         mediaContData.volume = foundVolume;
-    }
+
     lastVolume = foundVolume;
 
     // (YTM) Check svg used by mute | (YT) Just check the title
     const muteFound = isYTMusic ? muteButton.querySelector('path').getAttribute('d').startsWith('M3') : muteButton.title == "Unmute (m)";
-    if (forced || (muteFound != lastMute && lastMute != null && muteFound == true)) {
-        console.log("send mute" + muteFound)
+    if (forced || (muteFound != lastMute && lastMute != null && muteFound == true))
         mediaContData.mute = muteFound;
-    }
+
     lastMute = muteFound;
-    if (Object.keys(mediaContData).length > 1) {
+    if (Object.keys(mediaContData).length > 1)
         conn.send(JSON.stringify(mediaContData));
-        console.log(mediaContData);
-    }
 }
 
 const validHosts = [
