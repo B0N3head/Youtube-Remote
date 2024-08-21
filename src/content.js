@@ -1,6 +1,7 @@
 // Compatible with YouTube NonStop 0.9.2
 // Thx lawfx for the awesome extension and inspiration to make this <3
 console.log(`[Youtube Remote v${chrome.runtime.getManifest().version}]`);
+let ytRemote = null;
 
 // "inject" Toastify css 1.12.0
 var toastifyJS = document.createElement('style');
@@ -15,7 +16,8 @@ const scriptInject = (_script, _className) => {
             script.className = _className;
         script.addEventListener('load', resolve);
         script.addEventListener('error', e => reject(e.error, _className));
-        (document.documentElement).appendChild(script);
+        (document.head || document.documentElement).appendChild(script);
+        resolve(script);
     });
 }
 
@@ -29,7 +31,9 @@ const notifyRemote = () => {
 }
 
 chrome.storage.local.onChanged.addListener(notifyRemote); // Fires notifyRemote on change
-window.addEventListener("message", (event) => { // Fires on ytRemote request
+
+// Fires on ytRemote request
+window.addEventListener("message", (event) => {
     if (event.source !== window) return;
     if (event.data.type && event.data.type === "ytrGlobalRequest")
         notifyRemote();
@@ -39,11 +43,13 @@ window.addEventListener("message", (event) => { // Fires on ytRemote request
 scriptInject(chrome.runtime.getURL('libs/toastifyjs.js'), "toastifyjs").then(() => {
     scriptInject(chrome.runtime.getURL('libs/md5.js'), "peerjs").then(() => {
         scriptInject(chrome.runtime.getURL('libs/peerjs.js'), "peerjs").then(() => {
-            scriptInject(chrome.runtime.getURL('libs/ytRemote.js'), "ytremotescript").then(() => {
+            scriptInject(chrome.runtime.getURL('libs/ytRemote.js'), "ytremotescript").then((ytRemoteCreated) => {
+                ytRemote = ytRemoteCreated;
+
                 // Watch for our popup.js to call for our ID (only run if we have injected ytRemote)
                 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                     if (message.action === 'getID')
-                        sendResponse({ peerID: document.getElementsByClassName("ytremotescript")[0].id.toUpperCase() });
+                        sendResponse({ peerID: ytRemote.id.toUpperCase() });
                 });
             }).catch(error => console.error(`${_className} failed to inject into page:\n${error}`));
         }).catch(error => console.error(`${_className} failed to inject into page:\n${error}`));
