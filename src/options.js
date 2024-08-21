@@ -43,66 +43,7 @@ const runOnLoad = () => {
   }).catch((err) => ytrLog("Something went wrong accessing LastUsedKey", err));
 
   // -------- PeerJS --------
-  peer = new Peer({
-    config: {
-      'iceServers': [
-        { url: 'stun:stun.l.google.com:19302' },
-        { url: 'turn:turn.bistri.com:80', credential: 'homeo', username: 'homeo' }
-      ]
-    }
-  });
-
-  // Create our peerJS client
-  peer.on("open", (id) => {
-    peer.id = peer.id || lastPeerId;
-    lastPeerId = peer.id;
-    ytrLog("ID: " + peer.id);
-
-    // Let the user know we are ready
-    showLoading(false);
-    statusText.innerHTML = "Ready";
-    connectText.className = "text-slate-100  group-hover:text-white transition";
-  });
-
-  // Disallow incoming connections
-  peer.on("connection", (c) => {
-    c.on("open", () => {
-      ytrLog("Attempted connection to client closed");
-      setTimeout(() => { c.close(); }, 250);
-    });
-  });
-
-  // Attempt to reconnect if we lose connection
-  peer.on("disconnected", () => {
-    statusText.innerHTML = "Connection lost. Attempting reconnection";
-    ytrLog("Connection lost. Attempting reconnection");
-    setTimeout(() => {
-      peer.id = lastPeerId;
-      peer._lastServerId = lastPeerId;
-      peer.reconnect();
-    }, 250);
-    showLoading(false);
-  });
-
-  // Usually only fires if the peer has a serious issue, just ask for a refresh
-  peer.on("close", function () {
-    conn = null;
-    statusText.innerHTML = "Something went wrong. Plz refresh the page";
-    showLoading(false);
-  });
-
-  // Log all errors (to debug) but show the ones that revolve around crappy user input
-  peer.on("error", function (err) {
-    switch (err.type) {
-      case "browser-incompatible":
-        alert("Your browser does not support WebRTC\nPlease disable any blocking extensions and/or check that your browser supports WebRTC");
-        break;
-      case "peer-unavailable":
-        statusText.innerHTML = `Could not find ${conn.peer.toUpperCase()} :(`;
-        break;
-    }
-    showLoading(false);
-  });
+  setupPeer();
 
   document.getElementById("connectButton").addEventListener("click", () => {
     // Ignore user input if input is blank
@@ -251,6 +192,69 @@ const runOnLoad = () => {
   document.title = `YouTube Remote v${chrome.runtime.getManifest().version}`;
 }
 
+const setupPeer = () => {
+  peer = new Peer({
+    config: {
+      'iceServers': [
+        { url: 'stun:stun.l.google.com:19302' },
+        { url: 'turn:turn.bistri.com:80', credential: 'homeo', username: 'homeo' }
+      ]
+    }
+  });
+
+  // Create our peerJS client
+  peer.on("open", (id) => {
+    peer.id = peer.id || lastPeerId;
+    lastPeerId = peer.id;
+    ytrLog("ID: " + peer.id);
+
+    // Let the user know we are ready
+    showLoading(false);
+    statusText.innerHTML = "Ready";
+    connectText.className = "text-slate-100  group-hover:text-white transition";
+  });
+
+  // Disallow incoming connections
+  peer.on("connection", (c) => {
+    c.on("open", () => {
+      ytrLog("Attempted connection to client closed");
+      setTimeout(() => { c.close(); }, 250);
+    });
+  });
+
+  // Attempt to reconnect if we lose connection
+  peer.on("disconnected", () => {
+    statusText.innerHTML = "Connection lost. Attempting reconnection";
+    ytrLog("Connection lost. Attempting reconnection");
+    setTimeout(() => {
+      peer.id = lastPeerId;
+      peer._lastServerId = lastPeerId;
+      peer.reconnect();
+    }, 250);
+    showLoading(false);
+  });
+
+  // Usually only fires if the peer has a serious issue, just ask for a refresh
+  peer.on("close", function () {
+    conn = null;
+    statusText.innerHTML = "Something went wrong. Plz refresh the page";
+    showLoading(false);
+  });
+
+  // Log all errors (to debug) but show the ones that revolve around crappy user input
+  peer.on("error", function (err) {
+    switch (err.type) {
+      case "browser-incompatible":
+        alert("Your browser does not support WebRTC\nPlease disable any blocking extensions and/or check that your browser supports WebRTC");
+        break;
+      case "peer-unavailable":
+        statusText.innerHTML = `Could not find ${conn.peer.toUpperCase()} :(`;
+        break;
+    }
+    showLoading(false);
+  });
+}
+
 // -------- Misc --------
 const showLoading = (loading) => {
   isLoading = loading;
@@ -339,9 +343,10 @@ const catchMobileSleep = setInterval(() => {
   }
 
   // Check if our lastSync is older than 5 sec
-  if ((new Date().getTime() - lastSync) > 5000 && typeof conn != 'undefined') {
-    document.getElementById("connectButton").click();
-    conn = null;
+  if ((new Date().getTime() - lastSync) > 5000 && idInputElement.value.length == 6) {
+    simulateMobile(); // Make sure everything is null
+    setupPeer(); // Re-setup the peer
+    document.getElementById("connectButton").click(); // Attempt to reconnect
   }
 
   lastSync = new Date().getTime();
