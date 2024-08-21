@@ -328,6 +328,8 @@ const writeToLocalStorage = (data) => {
 
 let lastSync = null;
 const catchMobileSleep = setInterval(() => {
+
+  console.log("check sleep");
   // Ignore first loop
   if (lastSync == null) {
     lastSync = new Date().getTime();
@@ -335,9 +337,9 @@ const catchMobileSleep = setInterval(() => {
   }
 
   // Check if our lastSync is older than 5 sec
-  if ((new Date().getTime() - lastSync) > 5000) {
-    htmlTitle.innerHTML = "Sleep caught";
-     document.getElementById("connectButton").click();
+  if ((new Date().getTime() - lastSync) > 5000 && typeof conn != 'undefined') {
+    console.log("Sleep caught");
+    document.getElementById("connectButton").click();
   }
 
   lastSync = new Date().getTime();
