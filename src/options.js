@@ -140,9 +140,13 @@ const runOnLoad = () => {
 
     // Lets tell the user we connected successfully 
     conn.on("open", () => {
-      ytrLog("Connected to: " + conn.peer);
-      showLoading(false);
-      writeToLocalStorage({ YTRemoteLastUsedKey: conn.peer.toUpperCase() });
+      // This func will fire when mobile devices sleep->wake then try to reconnect (before the sleep catcher fixes the issue)
+      // So we have to add this to stop a failed reconnect then error when conn.peer is accessed
+      if (conn) {
+        ytrLog("Connected to: " + conn.peer);
+        showLoading(false);
+        writeToLocalStorage({ YTRemoteLastUsedKey: conn.peer.toUpperCase() });
+      }
     });
 
     // Handle incoming data (messages only since this is the signal sender)
@@ -328,8 +332,6 @@ const writeToLocalStorage = (data) => {
 
 let lastSync = null;
 const catchMobileSleep = setInterval(() => {
-
-  console.log("check sleep");
   // Ignore first loop
   if (lastSync == null) {
     lastSync = new Date().getTime();
@@ -338,12 +340,12 @@ const catchMobileSleep = setInterval(() => {
 
   // Check if our lastSync is older than 5 sec
   if ((new Date().getTime() - lastSync) > 5000 && typeof conn != 'undefined') {
-    console.log("Sleep caught");
     document.getElementById("connectButton").click();
+    conn = null;
   }
 
   lastSync = new Date().getTime();
-}, 2000);
+}, 3000);
 
 // tailwindcss 3.4.5
 (() => {
