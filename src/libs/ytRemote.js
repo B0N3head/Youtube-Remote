@@ -3,6 +3,14 @@ const scriptSelf = document.getElementsByClassName("ytremotescript")[0];
 const chars = "abcdefghjklmnopqrstuvwxyz";
 let ytrDebug = false;
 
+const validHosts = [
+    "https://i.ytimg.com/",
+    "https://img.youtube.com/",
+    "https://i3.ytimg.com/",
+    "https://yt3.ggpht.com/",
+    "https://lh3.googleusercontent.com/"
+];
+
 let youtubeNonStop = false;
 let nextButton, prevButton, pauseButton, muteButton, volumeSlider,
     lastMetaData, lastPause, lastMute, lastVolume, mediaContData,
@@ -304,14 +312,6 @@ const handleMediaChanges = (forced) => {
         conn.send(JSON.stringify(mediaContData));
 }
 
-const validHosts = [
-    "https://i.ytimg.com/",
-    "https://img.youtube.com/",
-    "https://i3.ytimg.com/",
-    "https://yt3.ggpht.com/",
-    "https://lh3.googleusercontent.com/"
-];
-
 const handleMetaDataChanges = () => {
     // Options.js cannot load external resources, so we'll just encode the image and send it to the client
     const metaDataFound = navigator.mediaSession.metadata;
@@ -373,7 +373,6 @@ const interval = setInterval(() => {
 }, 3000);
 
 // ---------- Misc ---------- 
-
 const createToastTmpl = (text) => {
     return Toastify({
         text: text,
@@ -428,23 +427,33 @@ window.addEventListener("message", (event) => {
         allowGlobalConnections = event.data.info;
 });
 
+// Generate ID for popup to display
+generateNewID(6);
+
 // Wait for the player controls to exist
 elementWait(isYTMusic ? "ytmusic-player-bar" : ".ytp-chrome-controls").then((elm) => {
-    generateNewID(6);
-    if (findMediaControls() && initPeerJS()) {
-        // Send request to our content.js for the current YTRemoteIsLocalConnectionOnly value
-        window.postMessage({ type: "ytrGlobalRequest" }, "*");
-        // Check if the variable exists (used by YT-nonstop)
-        youtubeNonStop = typeof lastInteractionTime !== "undefined";
-        ipChecker = setInterval(attemptIpHash, 2000);
+    // If the browser is super slow or super quick PeerJS won't init in time so wait for it to exist
+    const peerJSSanityCheck = setInterval(() => {
+        if (typeof Peer === "function") {
+            if (findMediaControls() && initPeerJS()) {
+                // Send request to our content.js for the current YTRemoteIsLocalConnectionOnly value
+                window.postMessage({ type: "ytrGlobalRequest" }, "*");
+                // Check if the variable exists (used by YT-nonstop)
+                youtubeNonStop = typeof lastInteractionTime !== "undefined";
+                ipChecker = setInterval(attemptIpHash, 2000);
 
-        ytrLog("Waiting for client connection");
-        readyToast.showToast();
-    } else {
-        // We don't want to check for updates if we aren't able to serve clients
-        clearInterval(interval);
-    }
+                ytrLog("Waiting for client connection");
+                readyToast.showToast();
+            } else {
+                // We don't want to check for updates if we aren't able to serve clients
+                clearInterval(interval);
+            }
 
-    if (youtubeNonStop)
-        ytrLog("Enabled Youtube NonStop Compatibility");
+            if (youtubeNonStop)
+                ytrLog("Enabled Youtube NonStop Compatibility");
+
+            // Remove self
+            clearInterval(peerJSSanityCheck);
+        }
+    }, 1000);
 });

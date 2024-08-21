@@ -130,10 +130,10 @@ const runOnLoad = () => {
     conn = peer.connect(idInputElement.value.toLowerCase(), { metadata: { localID: hashedIP }, reliable: true });
     currentUNIX = 0;
     setTimeout(() => {
-      if (currentUNIX == 0){
-        statusText.innerHTML = `Could not find ${conn.peer.toUpperCase()} :(`; 
-        resetUI(); 
-        conn=null;
+      if (currentUNIX == 0) {
+        statusText.innerHTML = `Could not find ${conn.peer.toUpperCase()} :(`;
+        resetUI();
+        conn = null;
       }
     }, 5000);
 
@@ -209,12 +209,16 @@ const runOnLoad = () => {
   pauseButton.addEventListener("click", () => sendPeerData(JSON.stringify({ type: "pause" })));
   nextButton.addEventListener("click", () => sendPeerData(JSON.stringify({ type: "next" })));
 
-  volumeSlider.addEventListener("mouseup", () => {
-    // easeInOutSine volume slider (desmos func bellow)
-    //-\left(\cos\left(0.01\pi x\right)-1\right)*50
-    const volume = volumeSlider.value != 0 ? -(Math.cos(Math.PI * 0.01 * volumeSlider.value) - 1) * 50 : 0;
-    sendPeerData(JSON.stringify({ type: "vol", vol: volume }));
+  // Add mobile support
+  ['mouseup', 'touchend'].forEach(function (e) {
+    volumeSlider.addEventListener(e, () => {
+      // easeInOutSine volume slider (desmos func bellow)
+      //-\left(\cos\left(0.01\pi x\right)-1\right)*50
+      const volume = volumeSlider.value != 0 ? -(Math.cos(Math.PI * 0.01 * volumeSlider.value) - 1) * 50 : 0;
+      sendPeerData(JSON.stringify({ type: "vol", vol: volume }));
+    });
   });
+
 
   document.getElementById("closeCredits").addEventListener("click", toggleCredits);
   document.getElementById("creditsShow").addEventListener("click", toggleCredits);
@@ -533,8 +537,15 @@ Check your Browserslist config to be sure that your targets are set up correctly
 document.addEventListener("DOMContentLoaded", () => {
   scriptInject(chrome.runtime.getURL("libs/md5.js"), "md5").then(() => {
     scriptInject(chrome.runtime.getURL("libs/peerjs.js"), "peerjs").then(() => {
-      ipChecker = setInterval(attemptIpHash, 2000);
-      runOnLoad();
+      const peerJSSanityCheck = setInterval(() => {
+        console.log("checking for peerjs")
+        if (typeof Peer === "function") {
+          console.log("peerjs found")
+          ipChecker = setInterval(attemptIpHash, 2000);
+          runOnLoad();
+          clearInterval(peerJSSanityCheck);
+        }
+      }, 1000);
     }).catch(err => console.error(err));
   }).catch(err => console.error(err));
 });
