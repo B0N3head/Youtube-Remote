@@ -1,7 +1,7 @@
 const isYTMusic = window.location.hostname === "music.youtube.com";
 const scriptSelf = document.getElementsByClassName("ytremotescript")[0];
 const chars = "abcdefghjklmnopqrstuvwxyz";
-let ytrDebug = false;
+let ytrDebug = true; // changed by user during runtime via console
 
 const validHosts = [
     "https://i.ytimg.com/",
@@ -16,7 +16,7 @@ let nextButton, prevButton, pauseButton, muteButton, volumeSlider,
     lastMetaData, lastPause, lastMute, lastVolume, mediaContData,
     ipChecker, hashedIP, allowGlobalConnections, receivedPong;
 
-// Ahh yes very readable
+// Ahh yes, this is very readable
 const ytrLog = (message, err) => ytrDebug && (err ? console.error(`[Youtube Remote] ${message}`, err) : console.log(`[Youtube Remote] ${message}`));
 
 // ---------- Element_Hunt ---------- 
@@ -31,7 +31,6 @@ const elementSearch = (id, name) => {
     }
 }
 
-// Searching and finding media elements
 const findMediaControls = () => {
     /* 
         Find buttons and use the .click() to simulate the user clicking it
@@ -102,6 +101,20 @@ const pauseSong = () => {
     // }, 500);
 }
 
+const getCurrentQueue = () => {
+    const main = document.getElementById("queue").getElementsByClassName("style-scope ytmusic-player-queue"); // FIX: this is crappy 
+    for (let i = 0; i < main.length; i++) {
+        if (main[i].getElementsByClassName("song-title style-scope ytmusic-player-queue-item").length > 0) { // FIX: prints the first object twice as id="contents" is used a crap tone
+            const dataOut = {
+                title: main[i].getElementsByClassName("song-title style-scope ytmusic-player-queue-item")[0].title,
+                artist: main[i].getElementsByClassName("byline style-scope ytmusic-player-queue-item")[0].title,
+                playing: (main[i].playButtonState == "playing")
+            };
+            console.log(JSON.stringify(dataOut));
+        }
+    }
+}
+
 const generateNewID = (length) => {
     let result = "";
     for (let i = 0; i < length; i++)
@@ -129,8 +142,8 @@ const setupConnection = (c) => {
     connToast.showToast();
 
     // Reset metadata incase it has already been collected
-    lastMetaData = null;
-    setTimeout(() => handleMediaChanges(true), 1000);    // Force
+    lastMetaData = null; // FIX: redo to mirror options.js rework
+    setTimeout(() => handleMediaChanges(true), 1000); 
 
     conn.on("data", (data) => {
         try {
@@ -284,7 +297,7 @@ const fetchImageAsBase64 = (artworkSRC) => {
         xhr.send();
     });
 }
-
+// FIX: redo to mirror options.js rework
 const handleMediaChanges = (forced) => {
     mediaContData = { type: "mediaControl" };
 
@@ -311,7 +324,7 @@ const handleMediaChanges = (forced) => {
     if (Object.keys(mediaContData).length > 1)
         conn.send(JSON.stringify(mediaContData));
 }
-
+// FIX: redo to mirror options.js rework
 const handleMetaDataChanges = () => {
     // Options.js cannot load external resources, so we'll just encode the image and send it to the client
     const metaDataFound = navigator.mediaSession.metadata;
@@ -423,8 +436,16 @@ const attemptIpHash = () => {
 // Listen for messages from content script
 window.addEventListener("message", (event) => {
     if (event.source !== window) return;
-    if (event.data.type && event.data.type === "ytrGlobalResponse")
-        allowGlobalConnections = event.data.info;
+    if (event.data.type) {
+        switch (event.data.type) {
+            case "ytrGlobalResponse":
+                allowGlobalConnections = event.data.info;
+                break;
+            case "ytrVersionResponse":
+                allowGlobalConnections = event.data.info;
+                break;
+        }
+    }
 });
 
 // Generate ID for popup to display

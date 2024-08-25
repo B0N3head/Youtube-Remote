@@ -97,28 +97,47 @@ const runOnLoad = () => {
         // Used for checking client pulse (no pong as the ping would error + we don"t care about latency)
         const connDataJson = JSON.parse(data);
         switch (connDataJson.type) {
+
+
+
+          // FIX: test this crap
           case "meta": // Metadata from song change
             if (connDataJson.time < currentUNIX) // This data is old???
               return;
 
-            // Update media metadata
             currentUNIX = connDataJson.time;
-            htmlTitle.innerHTML = connDataJson.title;
-            htmlArtist.innerHTML = connDataJson.artist;
-            if (connDataJson.artwork != null)
-              htmlArtwork.src = connDataJson.artwork;
-            break;
-          case "mediaControl": // If the server has messed with the player state, then we send updates to the client in an attempt to keep them synced
+
+            
+            // Update media controls
+            // If the server has messed with the player state, then we send updates to the client in an attempt to keep them synced
+            // No switch / ifelse tree as we want to check each part (not all data objects are sent all the time)
             if (connDataJson.play) {
               pauseButton.dataset.state = connDataJson.play ? "playing" : "paused";
               updateButtonUI();
             }
+
             if (connDataJson.mute) {
               serverIsMuted = connDataJson.mute;
               volumeSlide.value = 0;
             }
+
             if (connDataJson.volume && !serverIsMuted) // Don't change volume if server is currently muted
               volumeSlide.value = connDataJson.volume;
+
+            if (connDataJson.mute) {
+              serverIsMuted = connDataJson.mute;
+              volumeSlide.value = 0;
+            }
+
+            // Update media metadata
+            if (connDataJson.title) 
+              htmlTitle.innerHTML = connDataJson.title;
+          
+            if (connDataJson.artist) 
+              htmlArtist.innerHTML = connDataJson.artist;
+            
+            if (connDataJson.artwork != null)
+              htmlArtwork.src = connDataJson.artwork;
             break;
           case "accept":
             lastSuccessUNIX = Math.floor(Date.now() / 1000);
@@ -139,6 +158,7 @@ const runOnLoad = () => {
       }
     });
 
+    // TO-DO check if our server really closed or if we just lost connection (pre-close msg possibly)
     conn.on("close", () => {
       // If our last successful connection is older than 10 sec
       if ((Math.floor(Date.now() / 1000) - lastSuccessUNIX) > 10) {
