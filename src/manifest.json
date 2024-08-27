@@ -2,7 +2,7 @@
   "name": "YouTube Remote",
   "short_name": "YT Remote",
   "version": "2.0.1",
-  "description": "Control Youtube clients on any network!!!",
+  "description": "Control ANY youtube player on ANY network!!!",
   "host_permissions": [
     "https://api.ipify.org/",
     "https://i.ytimg.com/",

@@ -32,10 +32,10 @@ const notifyRemote = () => {
 }
 
 // INJECT ALL THE SCRIPTS
-scriptInject(chrome.runtime.getURL('libs/toastifyjs.js'), "toastifyjs").then(() => {
-    scriptInject(chrome.runtime.getURL('libs/md5.js'), "md5js").then(() => {
-        scriptInject(chrome.runtime.getURL('libs/peerjs.js'), "peerjs").then(() => {
-            scriptInject(chrome.runtime.getURL('libs/ytRemote.js'), "ytremotescript").then((ytRemoteCreated) => {
+scriptInject(chrome.runtime.getURL('libs/toastifyjs.js'), "toastifyjs").then(() => {    // Toast notifications for connections
+    scriptInject(chrome.runtime.getURL('libs/md5.js'), "md5js").then(() => {            // To hash client IP
+        scriptInject(chrome.runtime.getURL('libs/peerjs.js'), "peerjs").then(() => {    // For p2p connections
+            scriptInject(chrome.runtime.getURL('libs/ytRemote.js'), "ytremotescript").then((ytRemoteCreated) => { // Main script
                 ytRemote = ytRemoteCreated;
                 // Watch for our popup.js to call for our ID (only run if we have injected ytRemote)
                 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {

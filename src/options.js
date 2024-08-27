@@ -19,16 +19,176 @@ const volumeSlider = document.getElementById("volumeSlide");
 
 // Misc
 let ipChecker, hashedIP, serverIsMuted;
-let currentUNIX = 0;
-let lastSuccessUNIX = 0;
+let currentUNIX = 0, lastSuccessUNIX = 0;
+let ytrDebug = true, receivedPong = false;
 const waitIconElement = document.getElementById("waitIcon");
 const readyIconElement = document.getElementById("readyIcon");
 const creditsElement = document.getElementById("mainCredits");
-let ytrDebug = false;
+const links = {
+  "boneCredit": "https://github.com/B0N3head",
+  "infinCredit": "https://github.com/infinitumio",
+  "peerCredit": "https://peerjs.com/",
+  "tailCredit": "https://tailwindcss.com/",
+  "toastCredit": "https://github.com/apvarun/toastify-js"
+};
 
 const ytrLog = (message, err) => ytrDebug && (err ? console.error(`[Youtube Remote] ${message}`, err) : console.log(`[Youtube Remote] ${message}`));
 
 const sendPeerData = (data) => conn && conn.open ? (conn.send(data), ytrLog(data)) : ytrLog("Connection is closed");
+
+const connectionTimeout = {
+  start(timeoutMS) {
+    // If we already have a timeout running cancel
+    if (typeof this.timeoutID === "number")
+      this.cancel();
+
+    this.timeoutID = setTimeout((msg) => {
+      if (lastSuccessUNIX > 2) {
+        conn = null;
+        statusText.innerHTML = `Could not find ${conn.peer.toUpperCase()} :(`;
+        resetUI();
+      }
+      this.timeoutID = undefined;
+    }, timeoutMS);
+  },
+
+  cancel() {
+    clearTimeout(this.timeoutID);
+  },
+};
+
+const connectToYTServer = () => {
+  if (isLoading) // In the process of connecting or disconnecting, wait ya dam turn
+    return;
+
+  // Ignore user input if input isn't an ID
+  if (idInputElement.value.length != 6) {
+    statusText.innerHTML = `That ID is too ${(idInputElement.value.length > 6) ? "long" : "short"}, check again`;
+    setTimeout(() => statusText.innerHTML = "Ready", 1500);
+    return;
+  }
+
+  showLoading(true);
+
+  // Disconnect any old connections
+  if (conn && conn.peer.toUpperCase() != idInputElement.value.toUpperCase()) {
+    statusText.innerHTML = "Disconnecting...";
+    conn.close();
+    conn = null;
+  }
+
+  // Tell the user we are doing something
+  statusText.innerHTML = "Attempting to connect...";
+
+  // Attempt to connect
+  conn = peer.connect(idInputElement.value.toLowerCase(), {
+    metadata: { localID: hashedIP },
+    reliable: true
+  });
+
+  // Set our time to be 0
+  currentUNIX = 0;
+  lastSuccessUNIX = 0; // This will be 1 on failure or 0 if we never connected
+
+  // If we have not connected to the client within 6 seconds then give up
+  connectionTimeout.start(6000);
+
+  // Lets tell the user we connected successfully 
+  conn.on("open", () => {
+    // This func will fire when mobile devices sleep->wake then try to reconnect (before the sleep catcher fixes the issue)
+    // So we have to add this to stop a failed reconnect then error when conn.peer is accessed
+    if (conn) {
+      ytrLog("Connected to: " + conn.peer);
+      showLoading(false);
+      writeToLocalStorage({ YTRemoteLastUsedKey: conn.peer.toUpperCase() });
+    }
+  });
+
+  console.log("a");
+  // Handle incoming data (messages only since this is the signal sender)
+  conn.on("data", (data) => {
+    console.log(data);
+    ytrLog(data);
+    // Used for checking client pulse (no pong as the ping would error + we don"t care about latency)
+    const connDataJson = JSON.parse(data);
+    switch (connDataJson.type) {
+
+      // FIX: test this crap
+      case "meta": // Metadata from song change
+        if (connDataJson.time < currentUNIX) // This data is old???
+          return;
+
+        currentUNIX = connDataJson.time;
+
+        // Update media controls
+        // If the server has messed with the player state, then we send updates to the client in an attempt to keep them synced
+        // No switch / ifelse tree as we want to check each part (not all data objects are sent all the time)
+        if (connDataJson.hasOwnProperty("playing")) {
+          pauseButton.dataset.state = connDataJson.playing ? "playing" : "paused";
+          updateButtonUI();
+        }
+
+        if (connDataJson.hasOwnProperty("mute")) {
+          serverIsMuted = connDataJson.mute;
+          volumeSlide.value = 0;
+        }
+
+        if (connDataJson.hasOwnProperty("volume") && !serverIsMuted) // Don't change volume if server is currently muted
+          volumeSlide.value = connDataJson.volume;
+
+        // Update media metadata
+        if (connDataJson.title)
+          htmlTitle.innerHTML = connDataJson.title;
+
+        if (connDataJson.artist)
+          htmlArtist.innerHTML = connDataJson.artist;
+
+        if (connDataJson.artwork != null)
+          htmlArtwork.src = connDataJson.artwork;
+        break;
+      case "accept":  // Server accepted the connection request
+        connectionTimeout.cancel();
+        lastSuccessUNIX = Math.floor(Date.now() / 1000);
+        statusText.innerHTML = "Connected to " + conn.peer.toUpperCase();
+        break;
+      case "reject":  // Our request has been declined :(    
+        lastSuccessUNIX = 1;
+        connectionTimeout.cancel();
+        statusText.innerHTML = "Server is not accepting connections :(";
+        setTimeout(() => { statusText.innerHTML = "Ready"; resetUI(); }, 4000);
+        break;
+      case "ping":
+        sendPeerData(JSON.stringify({ type: "pong", id: peer.id }));
+        break;
+      case "pong": // No ID check as we could only receive from an already connected server
+        receivedPong = true;
+        break;
+      default:
+        ytrLog(`Unknown data ${data}`);
+    }
+  });
+
+  // TO-DO check if our server closed or if we just lost connection (pre-close msg possibly)
+  conn.on("close", () => {
+    // Check if our client still exists (false closes happen a lot with mobile connections)
+    receivedPong = false;
+    conn.send(JSON.stringify({ type: "ping" }));
+    setTimeout(() => {
+      if (receivedPong) { // YTServer is still responding client has not been closed
+        statusText.innerHTML = "Reconnected to " + conn.peer.toUpperCase();
+        return;
+      } else {
+        if ((Math.floor(Date.now() / 1000) - lastSuccessUNIX) > 10) {
+          if (lastSuccessUNIX != 1)
+            statusText.innerHTML = "Connection closed";
+          setTimeout(() => { statusText.innerHTML = "Ready"; resetUI(); }, 4000);
+          conn = null;
+        }
+        return;
+      }
+    }, 2500);
+  });
+}
 
 const runOnLoad = () => {
   // QOL - Attempt to get the last used key or last displayed key (in that order)
@@ -42,182 +202,51 @@ const runOnLoad = () => {
       }).catch((err) => ytrLog("Something went wrong accessing LastDisplayedKey", err));
   }).catch((err) => ytrLog("Something went wrong accessing LastUsedKey", err));
 
-  // -------- PeerJS --------
-  setupPeer();
+  // -------- PeerJS Setup --------
 
-  document.getElementById("connectButton").addEventListener("click", () => {
-    // Ignore user input if input is blank
-    if (isLoading)
-      return;
-
-    if (idInputElement.value.length != 6) {
-      statusText.innerHTML = `That ID is too ${(idInputElement.value.length > 6) ? "long" : "short"}, check again`;
-      setTimeout(() => statusText.innerHTML = "Ready", 1500);
-      return
-    }
-
-    showLoading(true);
-
-    // Disconnect any old connections
-    if (conn && conn.peer.toUpperCase() != idInputElement.value.toUpperCase()) {
-      statusText.innerHTML = "Disconnecting...";
-      conn.close();
-      conn = null;
-    }
-
-    // Tell the user we are doing something
-    statusText.innerHTML = "Attempting to connect...";
-
-    // Attempt to connect
-    conn = peer.connect(idInputElement.value.toLowerCase(), { metadata: { localID: hashedIP }, reliable: true });
-    currentUNIX = 0;
-    setTimeout(() => {
-      if (currentUNIX == 0) {
-        statusText.innerHTML = `Could not find ${conn.peer.toUpperCase()} :(`;
-        resetUI();
-        conn = null;
-      }
-    }, 5000);
-
-    // Lets tell the user we connected successfully 
-    conn.on("open", () => {
-      // This func will fire when mobile devices sleep->wake then try to reconnect (before the sleep catcher fixes the issue)
-      // So we have to add this to stop a failed reconnect then error when conn.peer is accessed
-      if (conn) {
-        ytrLog("Connected to: " + conn.peer);
-        showLoading(false);
-        writeToLocalStorage({ YTRemoteLastUsedKey: conn.peer.toUpperCase() });
-      }
-    });
-
-    // Handle incoming data (messages only since this is the signal sender)
-    conn.on("data", (data) => {
-      try {
-        ytrLog(data);
-        // Used for checking client pulse (no pong as the ping would error + we don"t care about latency)
-        const connDataJson = JSON.parse(data);
-        switch (connDataJson.type) {
-
-
-
-          // FIX: test this crap
-          case "meta": // Metadata from song change
-            if (connDataJson.time < currentUNIX) // This data is old???
-              return;
-
-            currentUNIX = connDataJson.time;
-
-            
-            // Update media controls
-            // If the server has messed with the player state, then we send updates to the client in an attempt to keep them synced
-            // No switch / ifelse tree as we want to check each part (not all data objects are sent all the time)
-            if (connDataJson.play) {
-              pauseButton.dataset.state = connDataJson.play ? "playing" : "paused";
-              updateButtonUI();
-            }
-
-            if (connDataJson.mute) {
-              serverIsMuted = connDataJson.mute;
-              volumeSlide.value = 0;
-            }
-
-            if (connDataJson.volume && !serverIsMuted) // Don't change volume if server is currently muted
-              volumeSlide.value = connDataJson.volume;
-
-            if (connDataJson.mute) {
-              serverIsMuted = connDataJson.mute;
-              volumeSlide.value = 0;
-            }
-
-            // Update media metadata
-            if (connDataJson.title) 
-              htmlTitle.innerHTML = connDataJson.title;
-          
-            if (connDataJson.artist) 
-              htmlArtist.innerHTML = connDataJson.artist;
-            
-            if (connDataJson.artwork != null)
-              htmlArtwork.src = connDataJson.artwork;
-            break;
-          case "accept":
-            lastSuccessUNIX = Math.floor(Date.now() / 1000);
-            statusText.innerHTML = "Connected to: " + conn.peer.toUpperCase();
-            break;
-          case "reject": // Our request has been politely declined :(    
-            lastSuccessUNIX = 1;
-            statusText.innerHTML = connDataJson.value ? `Server is not accepting connections :(<br>${connDataJson.value}` : "Server is not accepting connections :(";
-            break;
-          case "ping":
-            sendPeerData(JSON.stringify({ type: "pong", id: peer.id }));
-            break;
-          default:
-            ytrLog(`Unknown data ${data}`);
-        }
-      } catch (err) {
-        ytrLog(`Error parsing data: ${err}`);
-      }
-    });
-
-    // TO-DO check if our server really closed or if we just lost connection (pre-close msg possibly)
-    conn.on("close", () => {
-      // If our last successful connection is older than 10 sec
-      if ((Math.floor(Date.now() / 1000) - lastSuccessUNIX) > 10) {
-        if (lastSuccessUNIX != 1)
-          statusText.innerHTML = "Connection closed";
-        setTimeout(() => { statusText.innerHTML = "Ready"; resetUI(); }, 4000);
-        conn = null;
-      }
-    });
-  });
+  setupPeerJSPeer();
+  document.getElementById("connectButton").addEventListener("click", () => connectToYTServer());
 
   // -------- Event Listeners --------
+
   prevButton.addEventListener("click", () => sendPeerData(JSON.stringify({ type: "prev" })));
-  pauseButton.addEventListener("click", () => sendPeerData(JSON.stringify({ type: "pause" })));
+  pauseButton.addEventListener("click", () => {
+    sendPeerData(JSON.stringify({ type: "pause" }))
+    // Ping pong the play/pause state (UI is client side but is updated when the player responds on play state change)
+    pauseButton.dataset.state = (pauseButton.dataset.state === "playing") ? "paused" : "playing";
+    updateButtonUI();
+  });
   nextButton.addEventListener("click", () => sendPeerData(JSON.stringify({ type: "next" })));
 
-  // Add mobile support
+  // Mobile slider support (uses touchend, instead of mouseup)
   ['mouseup', 'touchend'].forEach(function (e) {
     volumeSlider.addEventListener(e, () => {
-      // easeInOutSine volume slider (desmos func bellow)
-      //-\left(\cos\left(0.01\pi x\right)-1\right)*50
+      // easeInOutSine volume slider [desmos func -\left(\cos\left(0.01\pi x\right)-1\right)*50]
       const volume = volumeSlider.value != 0 ? -(Math.cos(Math.PI * 0.01 * volumeSlider.value) - 1) * 50 : 0;
       sendPeerData(JSON.stringify({ type: "vol", vol: volume }));
     });
   });
 
-
-  document.getElementById("closeCredits").addEventListener("click", toggleCredits);
-  document.getElementById("creditsShow").addEventListener("click", toggleCredits);
-
-  const links = {
-    "boneCredit": "https://github.com/B0N3head",
-    "infinCredit": "https://github.com/infinitumio",
-    "peerCredit": "https://peerjs.com/",
-    "tailCredit": "https://tailwindcss.com/",
-    "toastCredit": "https://github.com/apvarun/toastify-js"
-  };
-
+  // Setup click events for the credit links (array of links at the top)
   Object.keys(links).forEach(id => {
     document.getElementById(id).addEventListener("click", () => window.open(links[id], "_blank"));
   });
 
-  pauseButton.addEventListener("click", () => {
-    // Ping pong the play/pause stated
-    pauseButton.dataset.state = (pauseButton.dataset.state === "playing") ? "paused" : "playing";
-    updateButtonUI();
-  });
+  // Toggle the credits UI
+  document.getElementById("closeCredits").addEventListener("click", toggleCredits);
+  document.getElementById("creditsShow").addEventListener("click", toggleCredits);
 
   // Change all references to the version to load from the manifest file
   document.getElementById("version").innerHTML = `v${chrome.runtime.getManifest().version}`;
   document.title = `YouTube Remote v${chrome.runtime.getManifest().version}`;
 }
 
-const setupPeer = () => {
+const setupPeerJSPeer = () => {
   peer = new Peer({
     config: {
       'iceServers': [
-        { url: 'stun:stun.l.google.com:19302' },
-        { url: 'turn:turn.bistri.com:80', credential: 'homeo', username: 'homeo' }
+        { urls: 'stun:stun.l.google.com:19302' },
+        { urls: 'turn:turn.bistri.com:80', credential: 'homeo', username: 'homeo' }
       ]
     }
   });
@@ -310,7 +339,7 @@ const attemptIpHash = () => {
   fetch("https://api.ipify.org?format=json")
     .then(response => response.json())
     .then(data => {
-      hashedIP = md5(data.ip);
+      hashedIP = md5(data.ip + chrome.runtime.getManifest().version);
       clearInterval(ipChecker);
     })
     .catch(err => {
@@ -318,16 +347,17 @@ const attemptIpHash = () => {
     });
 }
 
-const simulateMobile = () => {
+// Used to test via console (not to be called via script)
+const simulateMobileError = () => {
   peer = null;
   conn = null;
 }
 
 const resetUI = () => {
-  showLoading(false);
   htmlTitle.innerHTML = "Nothing";
   htmlArtist.innerHTML = "The silence is deafening";
   htmlArtwork.src = "";
+  loading(false);
 }
 
 const scriptInject = (_script, _className) => {
@@ -336,7 +366,7 @@ const scriptInject = (_script, _className) => {
     script.src = _script;
     if (_className)
       script.className = _className;
-    script.addEventListener("load", resolve);
+    script.addEventListener("load", resolve(script));
     script.addEventListener("error", e => reject(e.error));
     (document.head || document.documentElement).appendChild(script);
   });
@@ -354,6 +384,7 @@ const writeToLocalStorage = (data) => {
   });
 };
 
+// Isn't currently working 100%, plz fix
 let lastSync = null;
 const catchMobileSleep = setInterval(() => {
   // Ignore first loop
@@ -362,11 +393,15 @@ const catchMobileSleep = setInterval(() => {
     return;
   }
 
-  // Check if our lastSync is older than 5 sec
-  if ((new Date().getTime() - lastSync) > 5000 && idInputElement.value.length == 6) {
-    simulateMobile(); // Make sure everything is null
-    setupPeer(); // Re-setup the peer
-    document.getElementById("connectButton").click(); // Attempt to reconnect
+  // Check if our lastSync is older than 10 sec
+  if ((new Date().getTime() - lastSync) > 10000) {
+    // Reset our variables (as if the page reloaded)
+    lastPeerId = null;
+    peer = null;
+    conn = null;
+    setupPeerJSPeer(); // Re-setup the peer
+    if (idInputElement.value.length == 6) // An ID is in our input and we had a connection
+      document.getElementById("connectButton").click(); // Attempt to connect to previous client
   }
 
   lastSync = new Date().getTime();
@@ -584,7 +619,7 @@ Check your Browserslist config to be sure that your targets are set up correctly
 document.addEventListener("DOMContentLoaded", () => {
   scriptInject(chrome.runtime.getURL("libs/md5.js"), "md5").then(() => {
     scriptInject(chrome.runtime.getURL("libs/peerjs.js"), "peerjs").then(() => {
-      const peerJSSanityCheck = setInterval(() => {
+      const peerJSSanityCheck = setInterval(() => { // Make absolute sure that PeerJS has loaded
         if (typeof Peer === "function") {
           ipChecker = setInterval(attemptIpHash, 2000);
           runOnLoad();
