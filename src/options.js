@@ -34,7 +34,7 @@ const links = {
 
 const ytrLog = (message, err) => ytrDebug && (err ? console.error(`[Youtube Remote] ${message}`, err) : console.log(`[Youtube Remote] ${message}`));
 
-const sendPeerData = (data) => conn && conn.open ? (conn.send(data), ytrLog(data)) : ytrLog("Connection is closed");
+const sendPeerData = (data) => conn && conn.open ? (conn.send(msgpack.encode(data)), ytrLog(`Sent: ${data}`)) : ytrLog("Connection is closed");
 
 const connectionTimeout = {
   start(timeoutMS) {
@@ -106,9 +106,9 @@ const connectToYTServer = () => {
 
   console.log("a");
   // Handle incoming data (messages only since this is the signal sender)
-  conn.on("data", (data) => {
-    console.log(data);
-    ytrLog(data);
+  conn.on("data", (inputData) => {
+    const data = msgpack.decode(new Uint8Array(inputData));
+    ytrLog(`Rec: ${data}`);
     // Used for checking client pulse (no pong as the ping would error + we don"t care about latency)
     const connDataJson = JSON.parse(data);
     switch (connDataJson.type) {
@@ -619,13 +619,20 @@ Check your Browserslist config to be sure that your targets are set up correctly
 document.addEventListener("DOMContentLoaded", () => {
   scriptInject(chrome.runtime.getURL("libs/md5.js"), "md5").then(() => {
     scriptInject(chrome.runtime.getURL("libs/peerjs.js"), "peerjs").then(() => {
-      const peerJSSanityCheck = setInterval(() => { // Make absolute sure that PeerJS has loaded
-        if (typeof Peer === "function") {
-          ipChecker = setInterval(attemptIpHash, 2000);
-          runOnLoad();
-          clearInterval(peerJSSanityCheck);
-        }
-      }, 1000);
+      scriptInject(chrome.runtime.getURL('libs/msgpack.js'), "msgpack").then(() => {
+        const peerJSSanityCheck = setInterval(() => { // Make absolute sure that PeerJS has loaded
+          if (typeof Peer === "function") {
+            ipChecker = setInterval(attemptIpHash, 2000);
+            runOnLoad();
+            clearInterval(peerJSSanityCheck);
+
+            var array = new Uint8Array([0x81, 0xA3, 0x66, 0x6F, 0x6F, 0xA3, 0x62, 0x61, 0x72]);
+            var data = msgpack.decode(array);
+            console.warn(array);
+            console.warn(data);
+          }
+        }, 1000);
+      }).catch(err => console.error(err));
     }).catch(err => console.error(err));
   }).catch(err => console.error(err));
 });

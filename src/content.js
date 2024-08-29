@@ -31,29 +31,32 @@ const notifyRemote = () => {
     });
 }
 
-// INJECT ALL THE SCRIPTS
-scriptInject(chrome.runtime.getURL('libs/toastifyjs.js'), "toastifyjs").then(() => {    // Toast notifications for connections
-    scriptInject(chrome.runtime.getURL('libs/md5.js'), "md5js").then(() => {            // To hash client IP
-        scriptInject(chrome.runtime.getURL('libs/peerjs.js'), "peerjs").then(() => {    // For p2p connections
-            scriptInject(chrome.runtime.getURL('libs/ytRemote.js'), "ytremotescript").then((ytRemoteCreated) => { // Main script
-                ytRemote = ytRemoteCreated;
-                // Watch for our popup.js to call for our ID (only run if we have injected ytRemote)
-                chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-                    if (message.action === 'getID')
-                        sendResponse({ peerID: ytRemote.id.toUpperCase() });
-                });
-                // Setup listener for when 'YTRemoteIsLocalConnectionOnly' changes
-                chrome.storage.local.onChanged.addListener(notifyRemote);
+// INJECT ALL THE SCRIPTS (should prob make this smaller)
+scriptInject(chrome.runtime.getURL('libs/toastifyjs.js'), "toastifyjs").then(() => {        // Toast notifications for connections
+    scriptInject(chrome.runtime.getURL('libs/md5.js'), "md5js").then(() => {                // To hash client IP
+        scriptInject(chrome.runtime.getURL('libs/peerjs.js'), "peerjs").then(() => {        // For p2p connections
+            scriptInject(chrome.runtime.getURL('libs/msgpack.js'), "msgpack").then(() => {  // For making our data smaller  
+                scriptInject(chrome.runtime.getURL('libs/ytRemote.js'), "ytremotescript").then((ytRemoteCreated) => { // Main script
+                    ytRemote = ytRemoteCreated;
 
-                // Fires on ytRemote.js request (when a new connection comes in we double check the var)
-                window.addEventListener("message", (event) => {
-                    if (event.source !== window) return;
-                    if (event.data.type && event.data.type === "ytrGlobalRequest")
-                        notifyRemote();
-                });
+                    // Watch for our popup.js to call for our ID (only run if we have injected ytRemote)
+                    chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+                        if (message.action === 'getID')
+                            sendResponse({ peerID: ytRemote.id.toUpperCase() });
+                    });
+                    // Setup listener for when 'YTRemoteIsLocalConnectionOnly' changes
+                    chrome.storage.local.onChanged.addListener(notifyRemote);
 
-                // Send the version number to ytRemote.js ( serves as a sanity check our script is functioning)
-                window.postMessage({ type: "ytrVersionResponse", info: chrome.runtime.getManifest().version });
+                    // Fires on ytRemote.js request (when a new connection comes in we double check the var)
+                    window.addEventListener("message", (event) => {
+                        if (event.source !== window) return;
+                        if (event.data.type && event.data.type === "ytrGlobalRequest")
+                            notifyRemote();
+                    });
+
+                    // Send the version number to ytRemote.js ( serves as a sanity check our script is functioning)
+                    window.postMessage({ type: "ytrVersionResponse", info: chrome.runtime.getManifest().version });
+                }).catch(error => console.error(`${_className} failed to inject into page:\n${error}`));
             }).catch(error => console.error(`${_className} failed to inject into page:\n${error}`));
         }).catch(error => console.error(`${_className} failed to inject into page:\n${error}`));
     }).catch(error => console.error(`${_className} failed to inject into page:\n${error}`));

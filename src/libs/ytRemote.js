@@ -197,9 +197,12 @@ const setupConnection = (c) => {
     });
 
     conn.on("open", () => {
-        conn.send(JSON.stringify({ type: "accept" }));
+        var buffer = msgpack.encode({ foo: "bar" });
+        console.log(buffer);
+        conn.send(buffer);
+        //conn.send(JSON.stringify({ type: "accept" }));
         // Send metadata to client
-        sendClientMediaChanges(true);
+        //sendClientMediaChanges(true);
     });
 }
 
@@ -385,7 +388,7 @@ const sendClientMediaChanges = (forced) => {
 // Check every 2 sec for any changes that should be sent to the client
 const metadataCheckInterval = setInterval(() => {
     if (conn && conn.open) {
-        sendClientMediaChanges();
+        //sendClientMediaChanges();
     }
 }, 2000);
 
