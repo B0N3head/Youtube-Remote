@@ -21,8 +21,12 @@ let nextButton, prevButton, pauseButton, muteButton, volumeSlider,
     lastMetaTitle, lastPause, lastMute, lastVolume, mediaContData,
     ipChecker, hashedIP, allowGlobalConnections, receivedPong, ytrVersion;
 
+let failCount = 0, apiListCurrent = 0;
+
 // Ahh yes, this is very readable
-const ytrLog = (message, err) => ytrDebug && (err ? console.error(`[Youtube Remote] ${message}`, err) : console.log(`[Youtube Remote] ${message}`));
+const ytrLog = (message, err) => ytrDebug && (err ? (console.error(`[Youtube Remote] ${message}`, err), errorToast.showToast()) : console.log(`[Youtube Remote] ${message}`));
+
+const sendPeerData = (data) => conn && conn.open ? (conn.send(msgpack.encode(data)), ytrLog(`Sent: ${data}`)) : ytrLog("Connection is closed");
 
 // ---------- Element_Hunt ---------- 
 const elementSearch = (id, name) => {
@@ -134,16 +138,16 @@ let peer = null;
 let conn = null;
 
 const refuseConnection = (c) => {
-    ytrLog("Refusing connection from: " + c.peer);
+    ytrLog(`Refusing connection from: ${c.peer}`);
     c.on("open", () => {
-        c.send(JSON.stringify({ type: "reject" }));
+        c.send(msgpack.encode({ type: "reject" }));
         setTimeout(() => c.close(), 500);
     });
 }
 
 const setupConnection = (c) => {
     conn = c;
-    ytrLog("Connected to: " + conn.peer);
+    ytrLog(`Connected to: ${conn.peer}`);
     connToast.showToast();
 
     conn.on("data", (data) => {
@@ -174,7 +178,7 @@ const setupConnection = (c) => {
                     }
                     break;
                 case "ping":
-                    conn.send(JSON.stringify({ type: "ping" }));
+                    sendPeerData({ type: "ping" });
                     break;
                 case "pong":
                     if (message.id)
@@ -185,24 +189,20 @@ const setupConnection = (c) => {
                     break;
             }
         } catch (err) {
-            ytrLog(`Error handling data: ${err}`);
+            ytrLog("Error handling data", err);
         }
     });
 
     conn.on("close", () => {
         conn = null;
-        if (ytrDebug)
-            ytrLog("Connection reset");
+        ytrLog("Connection reset");
         lostToast.showToast();
     });
 
     conn.on("open", () => {
-        var buffer = msgpack.encode({ foo: "bar" });
-        console.log(buffer);
-        conn.send(buffer);
-        //conn.send(JSON.stringify({ type: "accept" }));
+        sendPeerData({ type: "accept" });
         // Send metadata to client
-        //sendClientMediaChanges(true);
+        sendClientMediaChanges(true);
     });
 }
 
@@ -220,43 +220,44 @@ const initPeerJS = () => {
     peer.on("open", (id) => {
         peer.id = peer.id || lastPeerId;
         lastPeerId = peer.id;
-
-        if (ytrDebug)
-            ytrLog(`Peer ID: ${peer.id}`);
+        ytrLog(`Peer ID: ${peer.id}`);
     });
 
     peer.on("connection", (c) => {
-        if (hashedIP == null) // If we have not got our own IP we prob shouldn't allow outside connections
+        if (hashedIP == null) // If we have not got our own IP we have serious issues, just stop
+        {
+            // better solution needed here
+            refuseConnection(c);
+            return;
+        }
 
-            // If our hashed IP doesn't match the clients and we don't want global connections then refuse
-            if (c.metadata.localID != hashedIP && !allowGlobalConnections) {
-                refuseConnection(c);
-                return;
-            }
+
+        // If our hashed IP doesn't match the clients and we don't want global connections then refuse
+        if (c.metadata.localID != hashedIP && !allowGlobalConnections) {
+            refuseConnection(c);
+            return;
+        }
 
         // Check if our connection is still alive, replace if dead
         if (conn && conn.open) {
             // Old Peer is trying to manually reconnect (connect them back)
             if (conn.peer == c.peer) {
                 setupConnection(c);
-                return;
+            } else {
+                // Check if our client still exists  
+                // This is mainly for mobile devices with their [sleep-wake], as it doesn't send a .close and
+                // peerJS's .send on its own won't throw anything if the peer never responds
+                // It's a hacky way to do this as ping over 2500ms will cause a disconnect from any peer if a new peer attempts to connect
+                receivedPong = false;
+                sendPeerData({ type: "ping" });
+                setTimeout(() => {
+                    if (receivedPong) { // If our old client responded then we can ignore the new client
+                        refuseConnection(c);
+                    } else {
+                        setupConnection(c);
+                    }
+                }, 2500);
             }
-
-            // Check if client currently exists  
-            //  This is mainly for mobile devices with their [sleep-wake], as it doesn't send a .close and
-            //  peerJS's .send on its own won't throw anything if the peer never responds
-            //  It's a hacky way to do this as ping over 2500ms will cause a disconnect from any peer if a new peer attempts to connect
-            receivedPong = false;
-            conn.send(JSON.stringify({ type: "ping" }));
-            setTimeout(() => {
-                if (receivedPong) { // If our old client responded then we can ignore the new client
-                    refuseConnection(c);
-                    return;
-                } else {
-                    setupConnection(c);
-                    return;
-                }
-            }, 2500);
         } else {
             // If we don't have a connection then set it up
             setupConnection(c);
@@ -280,7 +281,7 @@ const initPeerJS = () => {
         if (err.type == "browser-incompatible")
             alert("Your browser does not support WebRTC\nPlease disable any blocking extensions and/or check that your browser supports WebRTC");
         conn = null;
-        ytrLog(err);
+        ytrLog("PeerJS peer.on error thrown", err);
         errorToast.showToast();
     });
 
@@ -334,20 +335,16 @@ const sendClientMediaChanges = (forced) => {
                 });
             }
 
-            dataToSend.artwork = currentMatch; // Will be a url at this point
             dataToSend.title = currentMetadata.title;
             dataToSend.artist = currentMetadata.artist;
 
             // If the thumbnail host is in our manifest file then we can send it as a url to options.js
             // Otherwise we base64 encode and send it (incase yt changes the thumbnail domains or I've missed one)
             if (validHosts.some(validHost => currentMatch.startsWith(validHost))) {
-                conn.send(JSON.stringify(dataToSend));
+                dataToSend.artwork = currentMatch; // Will be a url
             } else {
                 fetchImageAsBase64(currentMatch)
-                    .then(base64Image => {
-                        dataToSend.artwork = base64Image;
-                        conn.send(JSON.stringify(dataToSend));
-                    })
+                    .then(base64Image => dataToSend.artwork = base64Image)
                     .catch(err => {
                         console.error(err);
                         errorToast.showToast();
@@ -378,7 +375,7 @@ const sendClientMediaChanges = (forced) => {
         // If something was added to our dataToSend, then send it to the client
         if (Object.keys(dataToSend).length > 1) {
             dataToSend.time = Math.floor(Date.now() / 1000);
-            conn.send(JSON.stringify(dataToSend));
+            sendPeerData(dataToSend);
         }
     } else {
         ytrDebug("No metadata to report on");
@@ -427,8 +424,64 @@ const elementWait = (selector) => {
     });
 }
 
-let failCount = 0;
-let apiListCurrent = 0;
+const getAttribute = (element, selector, attribute) => attribute ? element.querySelector(selector)?.getAttribute(attribute) ?? '' : element.querySelector(selector) ?? '';
+
+function extractSongDetails(noThumnails) {
+    const songDetails = [];
+    if (isYTMusic) { // is this a ytMusic queue?
+        const queueItems = document.querySelectorAll('ytmusic-player-queue-item');
+        queueItems.forEach(item => {
+            const data = {
+                t: getAttribute(item, '.song-title', 'title'),
+                a: getAttribute(item, '.byline', 'title'),
+                d: getAttribute(item, '.duration', 'title')
+            };
+
+            if (!noThumnails) {
+                const thumbnailElement = item.querySelector('yt-img-shadow img').src;
+                if (!thumbnailElement.startsWith("data:image/gif"))
+                    data.t = thumbnailElement.replace("https://i.ytimg.com/vi/", 'siytimg/');
+            }
+            songDetails.push(data);
+        });
+    } else { // nope, must be youtube then
+        const youtubePlaylist = document.querySelectorAll('ytd-playlist-panel-video-renderer'); // .length = 0 if on homepage or if no queue/playlist
+        const recommendedVideos = document.querySelectorAll('ytd-compact-video-renderer'); // .length = 0 if on homepage
+
+        if (youtubePlaylist.length > 0) // If the queue exists then use it
+            youtubePlaylist.forEach(item => {
+                const data = {
+                    t: getAttribute(item, '#video-title').textContent.trim(),
+                    a: getAttribute(item, '#byline').textContent.trim(),
+                    d: getAttribute(item, 'ytd-thumbnail-overlay-time-status-renderer #text').textContent.trim()
+                };
+
+                if (!noThumnails) {
+                    const thumbnailElement = item.querySelector('ytd-thumbnail img')?.src ?? '';
+                    if (thumbnailElement && !thumbnailElement.startsWith("data:image/gif"))
+                        data.i = thumbnailElement.replace("https://i.ytimg.com/vi/", 'siytimg/');
+                }
+                songDetails.push(data);
+            });
+        else if (recommendedVideos.length > 0) // If any videos are being recommended then serve that instead
+            recommendedVideos.forEach(item => {
+                const data = {
+                    t: getAttribute(item, '#video-title').textContent.trim(),
+                    a: getAttribute(recommendedVideos[0], 'ytd-channel-name').querySelector("yt-formatted-string").textContent,
+                    d: getAttribute(item, 'ytd-thumbnail-overlay-time-status-renderer #text').textContent.trim()
+                };
+
+                if (!noThumnails) {
+                    const thumbnailElement = item.querySelector('ytd-thumbnail img')?.src ?? '';
+                    if (thumbnailElement && !thumbnailElement.startsWith("data:image/gif"))
+                        data.i = thumbnailElement.replace("https://i.ytimg.com/vi/", 'siytimg/');
+                }
+                songDetails.push(data);
+            });
+    }
+    return songDetails;
+}
+//extractSongDetails();
 
 // Try to get a hashed IP (to test local connections against)
 const attemptIpHash = () => {
