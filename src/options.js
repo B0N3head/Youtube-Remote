@@ -18,7 +18,7 @@ const prevButton = document.getElementById("prevButton");
 const volumeSlider = document.getElementById("volumeSlide");
 
 // Misc
-let ipChecker, hashedIP, serverIsMuted;
+let ipChecker, catchMobileSleep, hashedIP, serverIsMuted;
 let currentUNIX = 0, lastSuccessUNIX = 0;
 let ytrDebug = true, receivedPong = false;
 const waitIconElement = document.getElementById("waitIcon");
@@ -34,7 +34,7 @@ const links = {
 
 const ytrLog = (message, err) => ytrDebug && (err ? console.error(`[Youtube Remote] ${message}`, err) : console.log(`[Youtube Remote] ${message}`));
 
-const sendPeerData = (data) => conn && conn.open ? (conn.send(msgpack.encode(data)), ytrLog(`Sent: ${data}`)) : ytrLog("Connection is closed");
+const sendPeerData = (data) => conn && conn.open ? (conn.send(JSON.stringify(msgpack.encode(data))), ytrLog(`Sent: ${data}`)) : ytrLog("Connection is closed");
 
 const connectionTimeout = {
   start(timeoutMS) {
@@ -112,17 +112,15 @@ const connectToYTServer = () => {
     // Used for checking client pulse (no pong as the ping would error + we don"t care about latency)
     const connDataJson = JSON.parse(data);
     switch (connDataJson.type) {
-
-      // FIX: test this crap
-      case "meta": // Metadata from song change
-        if (connDataJson.time < currentUNIX) // This data is old???
+      case "meta":
+        // No switch / ifelse tree as we want to check each part (not all data objects are sent all the time)
+        if (connDataJson.time < currentUNIX) // Ignore old data
           return;
 
         currentUNIX = connDataJson.time;
 
         // Update media controls
         // If the server has messed with the player state, then we send updates to the client in an attempt to keep them synced
-        // No switch / ifelse tree as we want to check each part (not all data objects are sent all the time)
         if (connDataJson.hasOwnProperty("playing")) {
           pauseButton.dataset.state = connDataJson.playing ? "playing" : "paused";
           updateButtonUI();
@@ -136,7 +134,7 @@ const connectToYTServer = () => {
         if (connDataJson.hasOwnProperty("volume") && !serverIsMuted) // Don't change volume if server is currently muted
           volumeSlide.value = connDataJson.volume;
 
-        // Update media metadata
+        // Media metadata
         if (connDataJson.title)
           htmlTitle.innerHTML = connDataJson.title;
 
@@ -384,17 +382,18 @@ const writeToLocalStorage = (data) => {
   });
 };
 
-// Isn't currently working 100%, plz fix
+const isMobileDevice = () => /Mobi|Android/i.test(navigator.userAgent);
 let lastSync = null;
-const catchMobileSleep = setInterval(() => {
+
+const monitorDeviceSleep = () => {
   // Ignore first loop
   if (lastSync == null) {
-    lastSync = new Date().getTime();
+    lastSync = Date.now();
     return;
   }
 
   // Check if our lastSync is older than 10 sec
-  if ((new Date().getTime() - lastSync) > 10000) {
+  if ((Date.now() - lastSync) > 10000) {
     // Reset our variables (as if the page reloaded)
     lastPeerId = null;
     peer = null;
@@ -404,8 +403,14 @@ const catchMobileSleep = setInterval(() => {
       document.getElementById("connectButton").click(); // Attempt to connect to previous client
   }
 
-  lastSync = new Date().getTime();
-}, 3000);
+  lastSync = Date.now();
+}
+
+const testMsgPack = () => {
+  var buffer = msgpack.encode(JSON.stringify({ "foo": "bar" }));
+  const connDataJson = JSON.parse(msgpack.decode(buffer));
+  ytrLog(`msgpack test: ${connDataJson.foo == "bar"}`);
+}
 
 // tailwindcss 3.4.5
 (() => {
@@ -616,20 +621,23 @@ Check your Browserslist config to be sure that your targets are set up correctly
   }); var nb = {}; _e(nb, { default: () => mO }); var mO, sb = C(() => { l(); mO = [] }); var ob = {}; _e(ob, { default: () => gO }); var ab, gO, lb = C(() => { l(); hi(); ab = X(bi()), gO = Ze(ab.default.theme) }); var fb = {}; _e(fb, { default: () => yO }); var ub, yO, cb = C(() => { l(); hi(); ub = X(bi()), yO = Ze(ub.default) }); l(); "use strict"; var wO = Je(pm()), bO = Je(ye()), vO = Je(ib()), xO = Je((sb(), nb)), kO = Je((lb(), ob)), SO = Je((cb(), fb)), CO = Je((Zn(), bu)), AO = Je((mo(), ho)), _O = Je((hs(), Ku)); function Je(i) { return i && i.__esModule ? i : { default: i } } var Hn = "tailwind", tu = "text/tailwindcss", pb = "/template.html", St, db = !0, hb = 0, ru = new Set, iu, mb = "", gb = (i = !1) => ({ get(e, t) { return (!i || t === "config") && typeof e[t] == "object" && e[t] !== null ? new Proxy(e[t], gb()) : e[t] }, set(e, t, r) { return e[t] = r, (!i || t === "config") && nu(!0), !0 } }); window[Hn] = new Proxy({ config: {}, defaultTheme: kO.default, defaultConfig: SO.default, colors: CO.default, plugin: AO.default, resolveConfig: _O.default }, gb(!0)); function yb(i) { iu.observe(i, { attributes: !0, attributeFilter: ["type"], characterData: !0, subtree: !0, childList: !0 }) } new MutationObserver(async i => { let e = !1; if (!iu) { iu = new MutationObserver(async () => await nu(!0)); for (let t of document.querySelectorAll(`style[type="${tu}"]`)) yb(t) } for (let t of i) for (let r of t.addedNodes) r.nodeType === 1 && r.tagName === "STYLE" && r.getAttribute("type") === tu && (yb(r), e = !0); await nu(e) }).observe(document.documentElement, { attributes: !0, attributeFilter: ["class"], childList: !0, subtree: !0 }); async function nu(i = !1) { i && (hb++, ru.clear()); let e = ""; for (let r of document.querySelectorAll(`style[type="${tu}"]`)) e += r.textContent; let t = new Set; for (let r of document.querySelectorAll("[class]")) for (let n of r.classList) ru.has(n) || t.add(n); if (document.body && (db || t.size > 0 || e !== mb || !St || !St.isConnected)) { for (let n of t) ru.add(n); db = !1, mb = e, self[pb] = Array.from(t).join(" "); let { css: r } = await (0, bO.default)([(0, wO.default)({ ...window[Hn].config, _hash: hb, content: { files: [pb], extract: { html: n => n.split(" ") } }, plugins: [...xO.default, ...Array.isArray(window[Hn].config.plugins) ? window[Hn].config.plugins : []] }), (0, vO.default)({ remove: !1 })]).process(`@tailwind base;@tailwind components;@tailwind utilities;${e}`); (!St || !St.isConnected) && (St = document.createElement("style"), document.head.append(St)), St.textContent = r } }
 })();
 
+
 document.addEventListener("DOMContentLoaded", () => {
   scriptInject(chrome.runtime.getURL("libs/md5.js"), "md5").then(() => {
     scriptInject(chrome.runtime.getURL("libs/peerjs.js"), "peerjs").then(() => {
       scriptInject(chrome.runtime.getURL('libs/msgpack.js'), "msgpack").then(() => {
         const peerJSSanityCheck = setInterval(() => { // Make absolute sure that PeerJS has loaded
           if (typeof Peer === "function") {
+            // Only runs when peerjs is setup
             ipChecker = setInterval(attemptIpHash, 2000);
             runOnLoad();
             clearInterval(peerJSSanityCheck);
 
-            var array = new Uint8Array([0x81, 0xA3, 0x66, 0x6F, 0x6F, 0xA3, 0x62, 0x61, 0x72]);
-            var data = msgpack.decode(array);
-            console.warn(array);
-            console.warn(data);
+            if (isMobileDevice()) {
+              ytrLog("Started mobile sleep catch");
+              catchMobileSleep = monitorDeviceSleep();
+            }
+
           }
         }, 1000);
       }).catch(err => console.error(err));

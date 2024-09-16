@@ -14,6 +14,26 @@
             padding: 0;
             background-color: #09090b;
         }
+
+        ::-webkit-scrollbar {
+            width: 10px;
+            height: 10px;
+        }   
+
+        ::-webkit-scrollbar-track {
+            border-radius: 100vh;
+            background: #141415;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #2c2c2d;
+            border-radius: 100vh;
+            border: 3px solid #141415;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #444446;
+        }
     </style>
 </head>
 
@@ -55,61 +75,139 @@
                 </div>
             </button>
         </div>
-        <div class="bg-[#1e1e1f] text-slate-100 p-8 rounded-b-[25px] shadow-lg w-110 mt-2"
-            style="background-size: 100% 100%;background-position: 0px 0px,0px 0px,0px 0px;background-image: radial-gradient(33% 43% at 5% 93%, #ffffff08 7%, #073AFF00 100%);">
-            <div class="container mb-4 bg-[#141415] rounded-md border border-white/10" style="height: 200px;">
-                <img id="artwork"
-                    style="height: 100%;object-fit: contain;display: block;margin-left: auto;margin-right: auto;"
-                    src="">
+        <div class="grid grid-cols-2 gap-2">
+            <div class="bg-[#1e1e1f] text-slate-100 p-8 rounded-b-[25px] shadow-lg mt-2">
+                <div class="container mb-4 bg-[#141415] rounded-md border border-white/10" style="height: 200px;">
+                    <img id="artwork"
+                        style="height: 100%;object-fit: contain;display: block;margin-left: auto;margin-right: auto;"
+                        src="">
+                </div>
+                <div style="width: 400px;">
+                    <p id="title" style="font-size: large;width: fit-content;">Nothing</p>
+                    <p id="artist" class="mb-4 text-slate-100/40">The silence is deafening</p>
+                </div>
+                <div class="group mb-4 flex items-center space-x-4 opacity-45 hover:opacity-90 transition">
+                    <svg fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-6">
+                        <path stroke-linecap="round" stroke-linejoin="round"
+                            d="M17.25 9.75 19.5 12m0 0 2.25 2.25M19.5 12l2.25-2.25M19.5 12l-2.25 2.25m-10.5-6 4.72-4.72a.75.75 0 0 1 1.28.53v15.88a.75.75 0 0 1-1.28.53l-4.72-4.72H4.51c-.88 0-1.704-.507-1.938-1.354A9.009 9.009 0 0 1 2.25 12c0-.83.112-1.633.322-2.396C2.806 8.756 3.63 8.25 4.51 8.25H6.75Z" />
+                    </svg>
+                    <input id="volumeSlide" type="range" min="0" max="100" step="1" value="90"
+                        class="w-full accent-[#fff]">
+                    <svg fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-6">
+                        <path stroke-linecap="round" stroke-linejoin="round"
+                            d="M19.114 5.636a9 9 0 0 1 0 12.728M16.463 8.288a5.25 5.25 0 0 1 0 7.424M6.75 8.25l4.72-4.72a.75.75 0 0 1 1.28.53v15.88a.75.75 0 0 1-1.28.53l-4.72-4.72H4.51c-.88 0-1.704-.507-1.938-1.354A9.009 9.009 0 0 1 2.25 12c0-.83.112-1.633.322-2.396C2.806 8.756 3.63 8.25 4.51 8.25H6.75Z" />
+                    </svg>
+                </div>
+                <div class="flex justify-between space-x-2">
+                    <button type="button" id="prevButton"
+                        class="group text-slate-100 py-2 px-4 rounded flex-1 bg-[#18181B]/50 backdrop-blur-lg font-bold border border-white/10 text-slate-100 shadow-sm hover:ring-1 hover:ring-white/10 transition">
+                        <div class="flex justify-center items-center">
+                            <svg fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"
+                                class="size-8 stroke-white/20 group-hover:stroke-white/50 transition" alt="Previous">
+                                <path stroke-linecap="round" stroke-linejoin="round"
+                                    d="M21 16.811c0 .864-.933 1.406-1.683.977l-7.108-4.061a1.125 1.125 0 0 1 0-1.954l7.108-4.061A1.125 1.125 0 0 1 21 8.689v8.122ZM11.25 16.811c0 .864-.933 1.406-1.683.977l-7.108-4.061a1.125 1.125 0 0 1 0-1.954l7.108-4.061a1.125 1.125 0 0 1 1.683.977v8.122Z" />
+                            </svg>
+                        </div>
+                    </button>
+                    <button type="button" id="pauseButton"
+                        class="group bg-[#18181B] py-2 rounded flex-1 font-bold border border-white/10 hover:ring-1 hover:ring-white/10 transition"
+                        data-state="playing">
+                        <div class="flex justify-center items-center">
+                            <svg fill="none" viewBox="0 0 24 24" stroke-width="3" stroke="currentColor"
+                                class="size-8 stroke-white stroke-white/50 group-hover:stroke-white/20 transition">
+                                <path stroke-linecap="round" stroke-linejoin="round"
+                                    d="M15.75 5.25v13.5m-7.5-13.5v13.5" />
+                            </svg>
+                        </div>
+                    </button>
+                    <button type="button" id="nextButton"
+                        class="group text-slate-100 py-2 px-4 rounded flex-1 bg-[#18181B]/50 backdrop-blur-lg font-bold border border-white/10 text-slate-100 shadow-sm hover:ring-1 hover:ring-white/10 transition">
+                        <div class="flex justify-center items-center">
+                            <svg fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"
+                                class="size-8 stroke-white/20 group-hover:stroke-white/50 transition" alt="Next">
+                                <path stroke-linecap="round" stroke-linejoin="round"
+                                    d="M3 8.689c0-.864.933-1.406 1.683-.977l7.108 4.061a1.125 1.125 0 0 1 0 1.954l-7.108 4.061A1.125 1.125 0 0 1 3 16.811V8.69ZM12.75 8.689c0-.864.933-1.406 1.683-.977l7.108 4.061a1.125 1.125 0 0 1 0 1.954l-7.108 4.061a1.125 1.125 0 0 1-1.683-.977V8.69Z" />
+                            </svg>
+                        </div>
+                    </button>
+                </div>
+                <p id="status" class="text-center font-bold text-slate-100/40 mt-2 select-none">Plz wait</p>
             </div>
-            <div style="width: 400px;">
-                <p id="title" style="font-size: large;width: fit-content;">Nothing</p>
-                <p id="artist" class="mb-4 text-slate-100/40">The silence is deafening</p>
-            </div>
-            <div class="group mb-4 flex items-center space-x-4 opacity-45 hover:opacity-90 transition">
-                <svg fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-6">
-                    <path stroke-linecap="round" stroke-linejoin="round"
-                        d="M17.25 9.75 19.5 12m0 0 2.25 2.25M19.5 12l2.25-2.25M19.5 12l-2.25 2.25m-10.5-6 4.72-4.72a.75.75 0 0 1 1.28.53v15.88a.75.75 0 0 1-1.28.53l-4.72-4.72H4.51c-.88 0-1.704-.507-1.938-1.354A9.009 9.009 0 0 1 2.25 12c0-.83.112-1.633.322-2.396C2.806 8.756 3.63 8.25 4.51 8.25H6.75Z" />
-                </svg>
-                <input id="volumeSlide" type="range" min="0" max="100" step="1" value="90" class="w-full accent-[#fff]">
-                <svg fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-6">
-                    <path stroke-linecap="round" stroke-linejoin="round"
-                        d="M19.114 5.636a9 9 0 0 1 0 12.728M16.463 8.288a5.25 5.25 0 0 1 0 7.424M6.75 8.25l4.72-4.72a.75.75 0 0 1 1.28.53v15.88a.75.75 0 0 1-1.28.53l-4.72-4.72H4.51c-.88 0-1.704-.507-1.938-1.354A9.009 9.009 0 0 1 2.25 12c0-.83.112-1.633.322-2.396C2.806 8.756 3.63 8.25 4.51 8.25H6.75Z" />
-                </svg>
-            </div>
-            <div class="flex justify-between space-x-2">
-                <button type="button" id="prevButton"
-                    class="group text-slate-100 py-2 px-4 rounded flex-1 bg-[#18181B]/50 backdrop-blur-lg font-bold border border-white/10 text-slate-100 shadow-sm hover:ring-1 hover:ring-white/10 transition">
-                    <div class="flex justify-center items-center">
-                        <svg fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"
-                            class="size-8 stroke-white/20 group-hover:stroke-white/50 transition" alt="Previous">
-                            <path stroke-linecap="round" stroke-linejoin="round"
-                                d="M21 16.811c0 .864-.933 1.406-1.683.977l-7.108-4.061a1.125 1.125 0 0 1 0-1.954l7.108-4.061A1.125 1.125 0 0 1 21 8.689v8.122ZM11.25 16.811c0 .864-.933 1.406-1.683.977l-7.108-4.061a1.125 1.125 0 0 1 0-1.954l7.108-4.061a1.125 1.125 0 0 1 1.683.977v8.122Z" />
-                        </svg>
+            <div class="bg-[#1e1e1f] text-slate-100 p-8 rounded-b-[25px] shadow-lg mt-2">
+                <p id="title" style="font-size: large;width: fit-content;" class="mb-2">Current Queue</p>
+                <div class="group mb-4 flex items-center space-x-4">
+                    <div class="relative rounded-xl overflow-auto bg-[#141415] border border-white/10">
+                        <div style="max-height:340px;"
+                            class="overflow-y-auto relative max-w-sm mx-auto shadow-lg rounded-xl flex flex-col divide-y dark:divide-white/10">
+                            <div class="flex items-center gap-4 p-4">
+                                <div class="flex flex-col">
+                                    <strong class="text-slate-900 text-sm font-medium dark:text-slate-200">Song
+                                        name</strong>
+                                    <span class="text-slate-500 text-sm font-medium dark:text-slate-400">Artist</span>
+                                </div>
+                            </div>
+                            <div class="flex items-center gap-4 p-4">
+                                <div class="flex flex-col">
+                                    <strong class="text-slate-900 text-sm font-medium dark:text-slate-200">Song
+                                        name</strong>
+                                    <span class="text-slate-500 text-sm font-medium dark:text-slate-400">Artist</span>
+                                </div>
+                            </div>
+                            <div class="flex items-center gap-4 p-4">
+                                <div class="flex flex-col">
+                                    <strong class="text-slate-900 text-sm font-medium dark:text-slate-200">Song
+                                        name</strong>
+                                    <span class="text-slate-500 text-sm font-medium dark:text-slate-400">Artist</span>
+                                </div>
+                            </div>
+                            <div class="flex items-center gap-4 p-4">
+                                <div class="flex flex-col">
+                                    <strong class="text-slate-900 text-sm font-medium dark:text-slate-200">Song
+                                        name</strong>
+                                    <span class="text-slate-500 text-sm font-medium dark:text-slate-400">Artist</span>
+                                </div>
+                            </div>
+                            <div class="flex items-center gap-4 p-4">
+                                <div class="flex flex-col">
+                                    <strong class="text-slate-900 text-sm font-medium dark:text-slate-200">Song
+                                        name</strong>
+                                    <span class="text-slate-500 text-sm font-medium dark:text-slate-400">Artist</span>
+                                </div>
+                            </div>
+                            <div class="flex items-center gap-4 p-4">
+                                <div class="flex flex-col">
+                                    <strong class="text-slate-900 text-sm font-medium dark:text-slate-200">Song
+                                        name</strong>
+                                    <span class="text-slate-500 text-sm font-medium dark:text-slate-400">Artist</span>
+                                </div>
+                            </div>
+                            <div class="flex items-center gap-4 p-4 opacity-70 hover:opacity-90 transition">
+                                <div class="flex flex-col">
+                                    <strong class="text-slate-900 text-sm font-medium dark:text-slate-200">Buy Now,
+                                        Sebastian
+                                        Ingrosso, Steve Angello, and Salvatore Ganacci</strong>
+                                    <span class="text-slate-500 text-sm font-medium dark:text-slate-400">"Let You Do
+                                        This
+                                        (with
+                                        Buy Now)"</span>
+                                </div>
+                            </div>
+                        </div>
                     </div>
-                </button>
-                <button type="button" id="pauseButton"
-                    class="group bg-[#18181B] py-2 rounded flex-1 font-bold border border-white/10 hover:ring-1 hover:ring-white/10 transition"
-                    data-state="playing">
-                    <div class="flex justify-center items-center">
-                        <svg fill="none" viewBox="0 0 24 24" stroke-width="3" stroke="currentColor"
-                            class="size-8 stroke-white stroke-white/50 group-hover:stroke-white/20 transition">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 5.25v13.5m-7.5-13.5v13.5" />
-                        </svg>
-                    </div>
-                </button>
-                <button type="button" id="nextButton"
-                    class="group text-slate-100 py-2 px-4 rounded flex-1 bg-[#18181B]/50 backdrop-blur-lg font-bold border border-white/10 text-slate-100 shadow-sm hover:ring-1 hover:ring-white/10 transition">
-                    <div class="flex justify-center items-center">
-                        <svg fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"
-                            class="size-8 stroke-white/20 group-hover:stroke-white/50 transition" alt="Next">
-                            <path stroke-linecap="round" stroke-linejoin="round"
-                                d="M3 8.689c0-.864.933-1.406 1.683-.977l7.108 4.061a1.125 1.125 0 0 1 0 1.954l-7.108 4.061A1.125 1.125 0 0 1 3 16.811V8.69ZM12.75 8.689c0-.864.933-1.406 1.683-.977l7.108 4.061a1.125 1.125 0 0 1 0 1.954l-7.108 4.061a1.125 1.125 0 0 1-1.683-.977V8.69Z" />
-                        </svg>
-                    </div>
-                </button>
+                </div>
             </div>
-            <p id="status" class="text-center font-bold text-slate-100/40 mt-2 select-none">Plz wait</p>
+        </div>
+    </div>
+
+
+    <div class="mt-4 -mb-3">
+        <div class="not-prose relative bg-slate-50 rounded-xl overflow-hidden dark:bg-slate-800/25">
+            <div style="background-position:10px 10px"
+                class="absolute inset-0 bg-grid-slate-100 [mask-image:linear-gradient(0deg,#fff,rgba(255,255,255,0.6))] dark:bg-grid-slate-700/25 dark:[mask-image:linear-gradient(0deg,rgba(255,255,255,0.1),rgba(255,255,255,0.5))]">
+            </div>
+
+            <div class="absolute inset-0 pointer-events-none border border-black/5 rounded-xl dark:border-white/5">
+            </div>
         </div>
     </div>
     <div style="display: none;" id="mainCredits">

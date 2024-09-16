@@ -11,23 +11,22 @@ const validHosts = [
     "https://lh3.googleusercontent.com/"
 ];
 
-const ipApiList = [
-    "https://api.ipify.org?format=json",
-    "http://jsonip.com/"
-];
-
 let youtubeNonStop = false;
 let nextButton, prevButton, pauseButton, muteButton, volumeSlider,
     lastMetaTitle, lastPause, lastMute, lastVolume, mediaContData,
     ipChecker, hashedIP, allowGlobalConnections, receivedPong, ytrVersion;
 
-let failCount = 0, apiListCurrent = 0;
-
 // Ahh yes, this is very readable
 const ytrLog = (message, err) => ytrDebug && (err ? (console.error(`[Youtube Remote] ${message}`, err), errorToast.showToast()) : console.log(`[Youtube Remote] ${message}`));
 
-const sendPeerData = (data) => conn && conn.open ? (conn.send(msgpack.encode(data)), ytrLog(`Sent: ${data}`)) : ytrLog("Connection is closed");
+const sendPeerData = (data) => conn && conn.open ? (conn.send(JSON.stringify(msgpack.encode(data))), ytrLog(`Sent: ${data}`)) : ytrLog("Connection is closed");
 
+const generateNewID = (length) => {
+    let result = "";
+    for (let i = 0; i < length; i++)
+        result += chars.charAt(Math.floor(Math.random() * chars.length));
+    scriptSelf.id = result;
+}
 // ---------- Element_Hunt ---------- 
 const elementSearch = (id, name) => {
     if (ytrDebug)
@@ -110,27 +109,6 @@ const pauseSong = () => {
     // }, 500);
 }
 
-const getCurrentQueue = () => {
-    const main = document.getElementById("queue").getElementsByClassName("style-scope ytmusic-player-queue"); // FIX: this is crappy 
-    for (let i = 0; i < main.length; i++) {
-        if (main[i].getElementsByClassName("song-title style-scope ytmusic-player-queue-item").length > 0) { // FIX: prints the first object twice as id="contents" is used a crap tone
-            const dataOut = {
-                title: main[i].getElementsByClassName("song-title style-scope ytmusic-player-queue-item")[0].title,
-                artist: main[i].getElementsByClassName("byline style-scope ytmusic-player-queue-item")[0].title,
-                playing: (main[i].playButtonState == "playing")
-            };
-            console.log(JSON.stringify(dataOut));
-        }
-    }
-}
-
-const generateNewID = (length) => {
-    let result = "";
-    for (let i = 0; i < length; i++)
-        result += chars.charAt(Math.floor(Math.random() * chars.length));
-    scriptSelf.id = result;
-}
-
 // ---------- PeerJS Server ---------- 
 
 let lastPeerId = null;
@@ -140,7 +118,7 @@ let conn = null;
 const refuseConnection = (c) => {
     ytrLog(`Refusing connection from: ${c.peer}`);
     c.on("open", () => {
-        c.send(msgpack.encode({ type: "reject" }));
+        c.send(msgpack.encode(JSON.stringify({ type: "reject" })));
         setTimeout(() => c.close(), 500);
     });
 }
@@ -152,7 +130,7 @@ const setupConnection = (c) => {
 
     conn.on("data", (data) => {
         try {
-            const message = JSON.parse(data);
+            const message = JSON.parse(msgpack.decode(data));
             switch (message.type) {
                 case "next":
                     nextSong();
@@ -178,7 +156,7 @@ const setupConnection = (c) => {
                     }
                     break;
                 case "ping":
-                    sendPeerData({ type: "ping" });
+                    sendPeerData({ type: "pong" });
                     break;
                 case "pong":
                     if (message.id)
@@ -354,6 +332,10 @@ const sendClientMediaChanges = (forced) => {
             lastMetaTitle = currentMetadata.title;
         };
 
+        // If we included the title then the next song is playing so we should update the queue
+        if (dataToSend.title)
+            dataToSend.queue = getCurrentQueue(false);
+
         // Check though metadata if currently playing
         const pauseFound = (navigator.mediaSession.playbackState == "playing")
         if (forced || (pauseFound != lastPause && lastPause != null))
@@ -390,7 +372,7 @@ const metadataCheckInterval = setInterval(() => {
 }, 2000);
 
 // ---------- Misc ---------- 
-const createToastTmpl = (text) => {
+const createToastTemplate = (text) => {
     return Toastify({
         text: text,
         duration: 3500,
@@ -404,10 +386,10 @@ const createToastTmpl = (text) => {
     });
 };
 
-const lostToast = createToastTmpl("YT-Remote - Client Disconnected");
-const connToast = createToastTmpl("YT-Remote - Client Connected");
-const readyToast = createToastTmpl("YT-Remote - Ready");
-const errorToast = createToastTmpl("YT-Remote - Error [See console]");
+const lostToast = createToastTemplate("YT-Remote - Client Disconnected");
+const connToast = createToastTemplate("YT-Remote - Client Connected");
+const readyToast = createToastTemplate("YT-Remote - Ready");
+const errorToast = createToastTemplate("YT-Remote - Error [See console]");
 
 const elementWait = (selector) => {
     return new Promise(resolve => {
@@ -426,24 +408,40 @@ const elementWait = (selector) => {
 
 const getAttribute = (element, selector, attribute) => attribute ? element.querySelector(selector)?.getAttribute(attribute) ?? '' : element.querySelector(selector) ?? '';
 
-function extractSongDetails(noThumnails) {
+let previousElements = [];
+const getCurrentQueue = (includeThumbnails) => {
     const songDetails = [];
+    let refreshQueue = false;
+
     if (isYTMusic) { // is this a ytMusic queue?
         const queueItems = document.querySelectorAll('ytmusic-player-queue-item');
-        queueItems.forEach(item => {
-            const data = {
-                t: getAttribute(item, '.song-title', 'title'),
-                a: getAttribute(item, '.byline', 'title'),
-                d: getAttribute(item, '.duration', 'title')
-            };
+        // Check if we have found something
+        if (queueItems.length > 0) {
 
-            if (!noThumnails) {
-                const thumbnailElement = item.querySelector('yt-img-shadow img').src;
-                if (!thumbnailElement.startsWith("data:image/gif"))
-                    data.t = thumbnailElement.replace("https://i.ytimg.com/vi/", 'siytimg/');
+            if (previousTopElement.length == 2) {
+                // Is this the same queue as before? (if so then we don't need to send the WHOLE queue to the client)
+                if (previousTopElement[0] == getAttribute(queueItems[0], '.song-title', 'title'))
+                    refreshQueue = true;
             }
-            songDetails.push(data);
-        });
+
+            
+            // Get all of our queued songs details
+            queueItems.forEach(item => {
+                if () ## SAVE THE CURRENT QUEUE INTO AN ARRAY, CHECK ONLY NEW AND FIRST. SEND ALL NEW ITEMS TO CLIENT
+                const data = {
+                    t: getAttribute(item, '.song-title', 'title'),
+                    a: getAttribute(item, '.byline', 'title'),
+                    d: getAttribute(item, '.duration', 'title')
+                };
+
+                if (includeThumbnails) { // This is unused... (it's a lil buggy)
+                    const thumbnailElement = item.querySelector('yt-img-shadow img').src; // dis part :(
+                    if (!thumbnailElement.startsWith("data:image/gif"))
+                        data.t = thumbnailElement.replace("https://i.ytimg.com/vi/", 'siytimg/');
+                }
+                songDetails.push(data);
+            });
+        }
     } else { // nope, must be youtube then
         const youtubePlaylist = document.querySelectorAll('ytd-playlist-panel-video-renderer'); // .length = 0 if on homepage or if no queue/playlist
         const recommendedVideos = document.querySelectorAll('ytd-compact-video-renderer'); // .length = 0 if on homepage
@@ -456,7 +454,7 @@ function extractSongDetails(noThumnails) {
                     d: getAttribute(item, 'ytd-thumbnail-overlay-time-status-renderer #text').textContent.trim()
                 };
 
-                if (!noThumnails) {
+                if (includeThumbnails) {
                     const thumbnailElement = item.querySelector('ytd-thumbnail img')?.src ?? '';
                     if (thumbnailElement && !thumbnailElement.startsWith("data:image/gif"))
                         data.i = thumbnailElement.replace("https://i.ytimg.com/vi/", 'siytimg/');
@@ -471,7 +469,58 @@ function extractSongDetails(noThumnails) {
                     d: getAttribute(item, 'ytd-thumbnail-overlay-time-status-renderer #text').textContent.trim()
                 };
 
-                if (!noThumnails) {
+                if (includeThumbnails) {
+                    const thumbnailElement = item.querySelector('ytd-thumbnail img')?.src ?? '';
+                    if (thumbnailElement && !thumbnailElement.startsWith("data:image/gif"))
+                        data.i = thumbnailElement.replace("https://i.ytimg.com/vi/", 'siytimg/');
+                }
+                songDetails.push(data);
+            });
+    }
+    return [songDetails, refreshQueue];
+}
+const selectSongInQueue = (songTitle) => {
+    if (isYTMusic) { // is this a ytMusic queue?
+        const queueItems = document.querySelectorAll('ytmusic-player-queue-item');
+        queueItems.forEach(item => {
+            let title = getAttribute(item, '.song-title', 'title')
+            if (title == "on our own") {
+                Array.from(item.getElementsByClassName("style-scope ytmusic-item-thumbnail-overlay-renderer")).forEach(clickable => {
+                    if (clickable.role == "button") {
+                        clickable.click();
+                        return;
+                    }
+                });
+            }
+        });
+    } else { // nope, must be youtube then
+        const youtubePlaylist = document.querySelectorAll('ytd-playlist-panel-video-renderer'); // .length = 0 if on homepage or if no queue/playlist
+        const recommendedVideos = document.querySelectorAll('ytd-compact-video-renderer'); // .length = 0 if on homepage
+
+        if (youtubePlaylist.length > 0) // If the queue exists then use it
+            youtubePlaylist.forEach(item => {
+                const data = {
+                    t: getAttribute(item, '#video-title').textContent.trim(),
+                    a: getAttribute(item, '#byline').textContent.trim(),
+                    d: getAttribute(item, 'ytd-thumbnail-overlay-time-status-renderer #text').textContent.trim()
+                };
+
+                if (includeThumbnails) {
+                    const thumbnailElement = item.querySelector('ytd-thumbnail img')?.src ?? '';
+                    if (thumbnailElement && !thumbnailElement.startsWith("data:image/gif"))
+                        data.i = thumbnailElement.replace("https://i.ytimg.com/vi/", 'siytimg/');
+                }
+                songDetails.push(data);
+            });
+        else if (recommendedVideos.length > 0) // If any videos are being recommended then serve that instead
+            recommendedVideos.forEach(item => {
+                const data = {
+                    t: getAttribute(item, '#video-title').textContent.trim(),
+                    a: getAttribute(recommendedVideos[0], 'ytd-channel-name').querySelector("yt-formatted-string").textContent,
+                    d: getAttribute(item, 'ytd-thumbnail-overlay-time-status-renderer #text').textContent.trim()
+                };
+
+                if (includeThumbnails) {
                     const thumbnailElement = item.querySelector('ytd-thumbnail img')?.src ?? '';
                     if (thumbnailElement && !thumbnailElement.startsWith("data:image/gif"))
                         data.i = thumbnailElement.replace("https://i.ytimg.com/vi/", 'siytimg/');
@@ -481,20 +530,17 @@ function extractSongDetails(noThumnails) {
     }
     return songDetails;
 }
-//extractSongDetails();
 
 // Try to get a hashed IP (to test local connections against)
 const attemptIpHash = () => {
-    fetch(ipApiList[apiListCurrent])
+    fetch("https://api.ipify.org?format=json")
         .then(response => response.json())
         .then(data => {
-            //Include current version as a "salt" (mainly to not allow mismatched local clients to connect)
+            // Include current version as a "salt" (mainly to not allow mismatched local clients to connect)
             hashedIP = md5(data.ip + ytrVersion);
             clearInterval(ipChecker);
         })
-        .catch(err => {
-            ytrLog("Could not generate hashed IP", err)
-        });
+        .catch(err => ytrLog("Could not generate hashed IP", err));
 }
 
 // Listen for messages from content script
@@ -505,7 +551,7 @@ window.addEventListener("message", (event) => {
             case "ytrGlobalResponse": // On globalConnections local storage value being changed
                 allowGlobalConnections = event.data.info;
                 break;
-            case "ytrVersionResponse": // Content.js sending the manafest version number
+            case "ytrVersionResponse": // Content.js sending the manifest version number
                 ytrVersion = event.data.info;
                 break;
         }
@@ -517,7 +563,7 @@ generateNewID(6);
 
 // Wait for the player controls to exist
 elementWait(isYTMusic ? "ytmusic-player-bar" : ".ytp-chrome-controls").then(() => {
-    // If the browser is super slow or super quick PeerJS won't init in time so wait for it to exist
+    // If the browser is super slow (or super quick) PeerJS won't init in time, so wait for it to exist
     const peerJSSanityCheck = setInterval(() => {
         if (typeof Peer === "function") {
             if (findMediaControls() && initPeerJS()) {
@@ -529,9 +575,10 @@ elementWait(isYTMusic ? "ytmusic-player-bar" : ".ytp-chrome-controls").then(() =
                 if (youtubeNonStop)
                     ytrLog("Enabled Youtube NonStop Compatibility");
 
-                // Start to attempt to retreive IP hash
+                // Start to attempt to retrieve IP hash
                 ipChecker = setInterval(attemptIpHash, 2000);
 
+                // Show that everything is good to go
                 readyToast.showToast();
                 ytrLog("Waiting for client connection");
             } else {
@@ -539,7 +586,7 @@ elementWait(isYTMusic ? "ytmusic-player-bar" : ".ytp-chrome-controls").then(() =
                 clearInterval(metadataCheckInterval);
             }
 
-            // Remove self
+            // Remove self sanity check
             clearInterval(peerJSSanityCheck);
         }
     }, 1000);
