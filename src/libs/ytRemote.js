@@ -132,7 +132,6 @@ const pauseSong = () => {
 };
 
 // ---------- PeerJS Server ----------
-
 let lastPeerId = null;
 let peer = null;
 let conn = null;
@@ -234,6 +233,7 @@ const initPeerJS = () => {
         ytrLog(`Peer ID: ${peer.id}`);
     });
 
+    //**NOT FINISHED**
     peer.on("connection", (c) => {
         // Try to get our stored password
         getPassword().then((storedPassword) => {
@@ -260,7 +260,7 @@ const initPeerJS = () => {
             refuseConnection(c);
             return;
         }
-        
+
         // Check if our connection is still alive then check if it's dead or the same client
         if (conn && conn.open) {
             // Old Peer is trying to manually reconnect (connect them back)
@@ -333,10 +333,8 @@ const fetchImageAsBase64 = (artworkSRC) => {
 
 const sendClientMediaChanges = (forced) => {
     const currentMetadata = navigator.mediaSession.metadata;
-
     if (currentMetadata != null) {
         let dataToSend = { type: "meta" };
-
         // Check if the song title has changed
         if (forced || currentMetadata.title != lastMetaTitle) {
             let currentMatch = null;
@@ -366,11 +364,7 @@ const sendClientMediaChanges = (forced) => {
 
             // If the thumbnail host is in our manifest file then we can send it as a url to options.js
             // Otherwise we base64 encode and send it (incase yt changes the thumbnail domains or I've missed one)
-            if (
-                validHosts.some((validHost) =>
-                    currentMatch.startsWith(validHost)
-                )
-            ) {
+            if (validHosts.some((validHost) => currentMatch.startsWith(validHost))) {
                 dataToSend.artwork = currentMatch; // Will be a url
             } else {
                 fetchImageAsBase64(currentMatch)
@@ -460,130 +454,6 @@ const elementWait = (selector) => {
         observer.observe(document.body, { childList: true, subtree: true });
     });
 };
-
-/*
-const getCurrentQueue = (includeThumbnails) => {
-    const songDetails = [];
-    let refreshQueue = false;
-
-    if (isYTMusic) { // is this a ytMusic queue?
-        const queueItems = document.querySelectorAll('ytmusic-player-queue-item');
-        // Check if we have found something
-        if (queueItems.length > 0) {
-
-            if (previousTopElement.length == 2) {
-                // Is this the same queue as before? (if so then we don't need to send the WHOLE queue to the client)
-                if (previousTopElement[0] == getAttribute(queueItems[0], '.song-title', 'title'))
-                    refreshQueue = true;
-            }
-
-            
-            // Get all of our queued songs details
-            queueItems.forEach(item => {
-                if (*TODO*) // SAVE THE CURRENT QUEUE INTO AN ARRAY, CHECK ONLY NEW AND FIRST. SEND ALL NEW ITEMS TO CLIENT
-                const data = {
-                    t: getAttribute(item, '.song-title', 'title'),
-                    a: getAttribute(item, '.byline', 'title'),
-                    d: getAttribute(item, '.duration', 'title')
-                };
-
-                if (includeThumbnails) { // This is unused... (it's a lil buggy)
-                    const thumbnailElement = item.querySelector('yt-img-shadow img').src; // dis part :(
-                    if (!thumbnailElement.startsWith("data:image/gif"))
-                        data.t = thumbnailElement.replace("https://i.ytimg.com/vi/", 'siytimg/');
-                }
-                songDetails.push(data);
-            });
-        }
-    } else { // nope, must be youtube then
-        const youtubePlaylist = document.querySelectorAll('ytd-playlist-panel-video-renderer'); // .length = 0 if on homepage or if no queue/playlist
-        const recommendedVideos = document.querySelectorAll('ytd-compact-video-renderer'); // .length = 0 if on homepage
-
-        if (youtubePlaylist.length > 0) // If the queue exists then use it
-            youtubePlaylist.forEach(item => {
-                const data = {
-                    t: getAttribute(item, '#video-title').textContent.trim(),
-                    a: getAttribute(item, '#byline').textContent.trim(),
-                    d: getAttribute(item, 'ytd-thumbnail-overlay-time-status-renderer #text').textContent.trim()
-                };
-
-                if (includeThumbnails) {
-                    const thumbnailElement = item.querySelector('ytd-thumbnail img')?.src ?? '';
-                    if (thumbnailElement && !thumbnailElement.startsWith("data:image/gif"))
-                        data.i = thumbnailElement.replace("https://i.ytimg.com/vi/", 'siytimg/');
-                }
-                songDetails.push(data);
-            });
-        else if (recommendedVideos.length > 0) // If any videos are being recommended then serve that instead
-            recommendedVideos.forEach(item => {
-                const data = {
-                    t: getAttribute(item, '#video-title').textContent.trim(),
-                    a: getAttribute(recommendedVideos[0], 'ytd-channel-name').querySelector("yt-formatted-string").textContent,
-                    d: getAttribute(item, 'ytd-thumbnail-overlay-time-status-renderer #text').textContent.trim()
-                };
-
-                if (includeThumbnails) {
-                    const thumbnailElement = item.querySelector('ytd-thumbnail img')?.src ?? '';
-                    if (thumbnailElement && !thumbnailElement.startsWith("data:image/gif"))
-                        data.i = thumbnailElement.replace("https://i.ytimg.com/vi/", 'siytimg/');
-                }
-                songDetails.push(data);
-            });
-    }
-    return [songDetails, refreshQueue];
-}
-const selectSongInQueue = (songTitle) => {
-    if (isYTMusic) { // is this a ytMusic queue?
-        const queueItems = document.querySelectorAll('ytmusic-player-queue-item');
-        queueItems.forEach(item => {
-            let title = getAttribute(item, '.song-title', 'title')
-            if (title == "on our own") {
-                Array.from(item.getElementsByClassName("style-scope ytmusic-item-thumbnail-overlay-renderer")).forEach(clickable => {
-                    if (clickable.role == "button") {
-                        clickable.click();
-                        return;
-                    }
-                });
-            }
-        });
-    } else { // nope, must be youtube then
-        const youtubePlaylist = document.querySelectorAll('ytd-playlist-panel-video-renderer'); // .length = 0 if on homepage or if no queue/playlist
-        const recommendedVideos = document.querySelectorAll('ytd-compact-video-renderer'); // .length = 0 if on homepage
-
-        if (youtubePlaylist.length > 0) // If the queue exists then use it
-            youtubePlaylist.forEach(item => {
-                const data = {
-                    t: getAttribute(item, '#video-title').textContent.trim(),
-                    a: getAttribute(item, '#byline').textContent.trim(),
-                    d: getAttribute(item, 'ytd-thumbnail-overlay-time-status-renderer #text').textContent.trim()
-                };
-
-                if (includeThumbnails) {
-                    const thumbnailElement = item.querySelector('ytd-thumbnail img')?.src ?? '';
-                    if (thumbnailElement && !thumbnailElement.startsWith("data:image/gif"))
-                        data.i = thumbnailElement.replace("https://i.ytimg.com/vi/", 'siytimg/');
-                }
-                songDetails.push(data);
-            });
-        else if (recommendedVideos.length > 0) // If any videos are being recommended then serve that instead
-            recommendedVideos.forEach(item => {
-                const data = {
-                    t: getAttribute(item, '#video-title').textContent.trim(),
-                    a: getAttribute(recommendedVideos[0], 'ytd-channel-name').querySelector("yt-formatted-string").textContent,
-                    d: getAttribute(item, 'ytd-thumbnail-overlay-time-status-renderer #text').textContent.trim()
-                };
-
-                if (includeThumbnails) {
-                    const thumbnailElement = item.querySelector('ytd-thumbnail img')?.src ?? '';
-                    if (thumbnailElement && !thumbnailElement.startsWith("data:image/gif"))
-                        data.i = thumbnailElement.replace("https://i.ytimg.com/vi/", 'siytimg/');
-                }
-                songDetails.push(data);
-            });
-    }
-    return songDetails;
-}
-*/
 
 // Try to get a hashed IP (to test local connections against)
 const attemptIpHash = () => {

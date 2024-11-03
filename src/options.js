@@ -19,7 +19,7 @@ const prevButton = document.getElementById("prevButton");
 const volumeSlider = document.getElementById("volumeSlide");
 
 // Misc
-let ipChecker, catchMobileSleep, hashedIP, serverIsMuted, connectionPassword;
+let ipChecker, hashedIP, serverIsMuted, connectionPassword, wakeLock;
 let currentUNIX = 0, lastSuccessUNIX = 0;
 let ytrDebug = true, receivedPong = false;
 const isMobileDevice = () => /Mobi|Android/i.test(navigator.userAgent);
@@ -29,7 +29,7 @@ const creditsElement = document.getElementById("mainCredits");
 const sleepMenu = document.getElementById("preventSleepMenu");
 const preventSleepToggle = document.getElementById('preventSleepToggle');
 const preventSleepText = document.getElementById('preventSleepText');
-let wakeLock = null;
+let lastSync = Date.now();
 const links = {
   "boneCredit": "https://github.com/B0N3head/",
   "infinCredit": "https://github.com/infinitumio/",
@@ -430,8 +430,6 @@ const writeToLocalStorage = (data) => {
   });
 };
 
-
-let lastSync = Date.now();
 const monitorDeviceSleep = () => {
   const currentTime = Date.now();
   if ((currentTime - lastSync) > 10000) { // Device was asleep for more than 10 seconds
@@ -447,12 +445,6 @@ const monitorDeviceSleep = () => {
   }
   lastSync = currentTime;
 };
-
-const testMsgPack = () => {
-  var buffer = msgpack.encode(JSON.stringify({ "foo": "bar" }));
-  const connDataJson = JSON.parse(msgpack.decode(buffer));
-  ytrLog(`msgpack test: ${connDataJson.foo == "bar"}`);
-}
 
 // tailwindcss 3.4.5
 (() => {
@@ -678,7 +670,7 @@ document.addEventListener("DOMContentLoaded", () => {
               ytrLog("Started mobile sleep catch");
               // Check every 5 seconds
               sleepMenu.style.display = "";
-              catchMobileSleep = setInterval(monitorDeviceSleep, 5000);
+              setInterval(monitorDeviceSleep, 5000);
             }
           }
         }, 1000);
