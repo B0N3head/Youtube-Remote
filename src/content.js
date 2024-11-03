@@ -31,6 +31,14 @@ const notifyRemote = () => {
     });
 }
 
+// When requested, return the local storage value of our set password
+const returnRemoteKey = () => {
+    chrome.storage.local.get(['YTRemotePassword']).then((result) => {
+        const password = result.YTRemotePassword || '';
+        window.postMessage({ type: "ytrPasswordResponse", password: password });
+    });
+}
+
 // INJECT ALL THE SCRIPTS (should prob make this smaller)
 scriptInject(chrome.runtime.getURL('libs/toastifyjs.js'), "toastifyjs").then(() => {        // Toast notifications for connections
     scriptInject(chrome.runtime.getURL('libs/md5.js'), "md5js").then(() => {                // To hash client IP
@@ -52,9 +60,11 @@ scriptInject(chrome.runtime.getURL('libs/toastifyjs.js'), "toastifyjs").then(() 
                         if (event.source !== window) return;
                         if (event.data.type && event.data.type === "ytrGlobalRequest")
                             notifyRemote();
+                        if (event.data.type && event.data.type === "ytrPasswordRequest")
+                            returnRemoteKey();
                     });
 
-                    // Send the version number to ytRemote.js ( serves as a sanity check our script is functioning)
+                    // Send the version number to ytRemote.js (also serves as a sanity check)
                     window.postMessage({ type: "ytrVersionResponse", info: chrome.runtime.getManifest().version });
                 }).catch(error => console.error(`${_className} failed to inject into page:\n${error}`));
             }).catch(error => console.error(`${_className} failed to inject into page:\n${error}`));

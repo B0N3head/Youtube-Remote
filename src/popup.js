@@ -8,6 +8,7 @@ const versionElement = document.getElementById("version");
 const localConnToggle = document.getElementById('localConnectionToggle'); // Local storage trigger for the ui Toggle 
 const localConnText = document.getElementById('localConnectionText'); // Local storage trigger for the ui Toggle 
 const idElement = document.getElementById('id');
+const passwordInputElement = document.getElementById("password");
 
 document.addEventListener('DOMContentLoaded', () => {
   const toggleLabel = localConnToggle ? localConnToggle.nextElementSibling : null;
@@ -45,6 +46,11 @@ document.addEventListener('DOMContentLoaded', () => {
     console.error("Error reading from local storage:", error);
   });
 
+  // Initialise the set password
+  chrome.storage.local.get(['YTRemotePassword']).then((result) => {
+    passwordInputElement.value = result.YTRemotePassword || '';
+  });
+
   // Add listener for toggle switch changes
   localConnToggle.addEventListener('change', (event) => {
     const isChecked = event.target.checked;
@@ -55,6 +61,12 @@ document.addEventListener('DOMContentLoaded', () => {
     }).catch((error) => {
       console.error("Error writing to local storage:", error);
     });
+  });
+
+  // Write changes to our password value as they are changed
+  passwordInputElement.addEventListener("change", () => {
+    const password = passwordInputElement.value;
+    writeToLocalStorage({ YTRemotePassword: password });
   });
 
   document.getElementById('open-options').addEventListener('click', () => {

@@ -5,6 +5,7 @@ let lastPeerId, peer, conn;
 const idInputElement = document.getElementById("recID");
 const statusText = document.getElementById("status");
 const connectText = document.getElementById("connectText");
+const passwordInputElement = document.getElementById("password");
 
 // Metadata
 const htmlTitle = document.getElementById("title");
@@ -18,18 +19,25 @@ const prevButton = document.getElementById("prevButton");
 const volumeSlider = document.getElementById("volumeSlide");
 
 // Misc
-let ipChecker, catchMobileSleep, hashedIP, serverIsMuted;
+let ipChecker, catchMobileSleep, hashedIP, serverIsMuted, connectionPassword;
 let currentUNIX = 0, lastSuccessUNIX = 0;
 let ytrDebug = true, receivedPong = false;
+const isMobileDevice = () => /Mobi|Android/i.test(navigator.userAgent);
 const waitIconElement = document.getElementById("waitIcon");
 const readyIconElement = document.getElementById("readyIcon");
 const creditsElement = document.getElementById("mainCredits");
+const sleepMenu = document.getElementById("preventSleepMenu");
+const preventSleepToggle = document.getElementById('preventSleepToggle');
+const preventSleepText = document.getElementById('preventSleepText');
+let wakeLock = null;
 const links = {
-  "boneCredit": "https://github.com/B0N3head",
-  "infinCredit": "https://github.com/infinitumio",
+  "boneCredit": "https://github.com/B0N3head/",
+  "infinCredit": "https://github.com/infinitumio/",
   "peerCredit": "https://peerjs.com/",
   "tailCredit": "https://tailwindcss.com/",
-  "toastCredit": "https://github.com/apvarun/toastify-js"
+  "toastCredit": "https://github.com/apvarun/toastify-js/",
+  "md5Credit": "https://github.com/blueimp/JavaScript-MD5/",
+  "msgpackCredit": "https://github.com/kawanet/msgpack-lite/"
 };
 
 const ytrLog = (message, err) => ytrDebug && (err ? console.error(`[Youtube Remote] ${message}`, err) : console.log(`[Youtube Remote] ${message}`));
@@ -216,14 +224,54 @@ const runOnLoad = () => {
   });
   nextButton.addEventListener("click", () => sendPeerData(JSON.stringify({ type: "next" })));
 
-  // Mobile slider support (uses touchend, instead of mouseup)
-  ['mouseup', 'touchend'].forEach(function (e) {
-    volumeSlider.addEventListener(e, () => {
-      // easeInOutSine volume slider [desmos func -\left(\cos\left(0.01\pi x\right)-1\right)*50]
-      const volume = volumeSlider.value != 0 ? -(Math.cos(Math.PI * 0.01 * volumeSlider.value) - 1) * 50 : 0;
-      sendPeerData(JSON.stringify({ type: "vol", vol: volume }));
-    });
+  chrome.storage.local.get(['YTRemotePassword']).then((result) => {
+    connectionPassword = result.YTRemotePassword || '';
+    passwordInputElement.value = connectionPassword;
   });
+
+  passwordInputElement.addEventListener("change", () => {
+    connectionPassword = passwordInputElement.value;
+    writeToLocalStorage({ YTRemotePassword: connectionPassword });
+  });
+
+  // Mobile slider support (uses touchend, instead of mouseup)
+  if (isMobileDevice()) {
+    ['mouseup', 'touchend'].forEach(function (e) {
+      volumeSlider.addEventListener(e, () => {
+        // easeInOutSine volume slider [desmos func -\left(\cos\left(0.01\pi x\right)-1\right)*50]
+        const volume = volumeSlider.value != 0 ? -(Math.cos(Math.PI * 0.01 * volumeSlider.value) - 1) * 50 : 0;
+        sendPeerData(JSON.stringify({ type: "vol", vol: volume }));
+      });
+    });
+
+    preventSleepToggle.addEventListener('change', async (event) => {
+      const target = event.target;
+      const isChecked = target.checked;
+      if (isChecked) {
+        try {
+          target.parentElement.querySelector('span').classList.replace('translate-x-5', 'translate-x-0');
+          target.parentElement.querySelector('span').style.background = "#63a757";
+          wakeLock = await navigator.wakeLock.request('screen');
+          preventSleepText.innerHTML = "Disabled Mobile Sleep";
+          wakeLock.addEventListener('release', () => {
+            preventSleepToggle.checked = false;
+            preventSleepText.innerHTML = "Enabled Mobile Sleep";
+          });
+        } catch (err) {
+          ytrLog('Wake Lock error', err);
+        }
+      } else {
+        target.parentElement.querySelector('span').classList.replace('translate-x-0', 'translate-x-5');
+        target.parentElement.querySelector('span').style.background = "#af3939";
+        if (wakeLock) {
+          wakeLock.release().then(() => {
+            wakeLock = null;
+            preventSleepText.innerHTML = "Enabled Mobile Sleep";
+          });
+        }
+      }
+    });
+  };
 
   // Setup click events for the credit links (array of links at the top)
   Object.keys(links).forEach(id => {
@@ -382,29 +430,23 @@ const writeToLocalStorage = (data) => {
   });
 };
 
-const isMobileDevice = () => /Mobi|Android/i.test(navigator.userAgent);
-let lastSync = null;
 
+let lastSync = Date.now();
 const monitorDeviceSleep = () => {
-  // Ignore first loop
-  if (lastSync == null) {
-    lastSync = Date.now();
-    return;
+  const currentTime = Date.now();
+  if ((currentTime - lastSync) > 10000) { // Device was asleep for more than 10 seconds
+    ytrLog("Device woke up from sleep, attempting to reconnect...");
+    if (conn) {
+      conn.close();
+      conn = null;
+    }
+    setupPeerJSPeer(); // Reinitialize PeerJS
+    if (idInputElement.value.length == 6) {
+      connectToYTServer(); // Reconnect to the server
+    }
   }
-
-  // Check if our lastSync is older than 10 sec
-  if ((Date.now() - lastSync) > 10000) {
-    // Reset our variables (as if the page reloaded)
-    lastPeerId = null;
-    peer = null;
-    conn = null;
-    setupPeerJSPeer(); // Re-setup the peer
-    if (idInputElement.value.length == 6) // An ID is in our input and we had a connection
-      document.getElementById("connectButton").click(); // Attempt to connect to previous client
-  }
-
-  lastSync = Date.now();
-}
+  lastSync = currentTime;
+};
 
 const testMsgPack = () => {
   var buffer = msgpack.encode(JSON.stringify({ "foo": "bar" }));
@@ -621,7 +663,6 @@ Check your Browserslist config to be sure that your targets are set up correctly
   }); var nb = {}; _e(nb, { default: () => mO }); var mO, sb = C(() => { l(); mO = [] }); var ob = {}; _e(ob, { default: () => gO }); var ab, gO, lb = C(() => { l(); hi(); ab = X(bi()), gO = Ze(ab.default.theme) }); var fb = {}; _e(fb, { default: () => yO }); var ub, yO, cb = C(() => { l(); hi(); ub = X(bi()), yO = Ze(ub.default) }); l(); "use strict"; var wO = Je(pm()), bO = Je(ye()), vO = Je(ib()), xO = Je((sb(), nb)), kO = Je((lb(), ob)), SO = Je((cb(), fb)), CO = Je((Zn(), bu)), AO = Je((mo(), ho)), _O = Je((hs(), Ku)); function Je(i) { return i && i.__esModule ? i : { default: i } } var Hn = "tailwind", tu = "text/tailwindcss", pb = "/template.html", St, db = !0, hb = 0, ru = new Set, iu, mb = "", gb = (i = !1) => ({ get(e, t) { return (!i || t === "config") && typeof e[t] == "object" && e[t] !== null ? new Proxy(e[t], gb()) : e[t] }, set(e, t, r) { return e[t] = r, (!i || t === "config") && nu(!0), !0 } }); window[Hn] = new Proxy({ config: {}, defaultTheme: kO.default, defaultConfig: SO.default, colors: CO.default, plugin: AO.default, resolveConfig: _O.default }, gb(!0)); function yb(i) { iu.observe(i, { attributes: !0, attributeFilter: ["type"], characterData: !0, subtree: !0, childList: !0 }) } new MutationObserver(async i => { let e = !1; if (!iu) { iu = new MutationObserver(async () => await nu(!0)); for (let t of document.querySelectorAll(`style[type="${tu}"]`)) yb(t) } for (let t of i) for (let r of t.addedNodes) r.nodeType === 1 && r.tagName === "STYLE" && r.getAttribute("type") === tu && (yb(r), e = !0); await nu(e) }).observe(document.documentElement, { attributes: !0, attributeFilter: ["class"], childList: !0, subtree: !0 }); async function nu(i = !1) { i && (hb++, ru.clear()); let e = ""; for (let r of document.querySelectorAll(`style[type="${tu}"]`)) e += r.textContent; let t = new Set; for (let r of document.querySelectorAll("[class]")) for (let n of r.classList) ru.has(n) || t.add(n); if (document.body && (db || t.size > 0 || e !== mb || !St || !St.isConnected)) { for (let n of t) ru.add(n); db = !1, mb = e, self[pb] = Array.from(t).join(" "); let { css: r } = await (0, bO.default)([(0, wO.default)({ ...window[Hn].config, _hash: hb, content: { files: [pb], extract: { html: n => n.split(" ") } }, plugins: [...xO.default, ...Array.isArray(window[Hn].config.plugins) ? window[Hn].config.plugins : []] }), (0, vO.default)({ remove: !1 })]).process(`@tailwind base;@tailwind components;@tailwind utilities;${e}`); (!St || !St.isConnected) && (St = document.createElement("style"), document.head.append(St)), St.textContent = r } }
 })();
 
-
 document.addEventListener("DOMContentLoaded", () => {
   scriptInject(chrome.runtime.getURL("libs/md5.js"), "md5").then(() => {
     scriptInject(chrome.runtime.getURL("libs/peerjs.js"), "peerjs").then(() => {
@@ -635,9 +676,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
             if (isMobileDevice()) {
               ytrLog("Started mobile sleep catch");
-              catchMobileSleep = monitorDeviceSleep();
+              // Check every 5 seconds
+              sleepMenu.style.display = "";
+              catchMobileSleep = setInterval(monitorDeviceSleep, 5000);
             }
-
           }
         }, 1000);
       }).catch(err => console.error(err));

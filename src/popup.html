@@ -1,6 +1,5 @@
 <!DOCTYPE html>
 <html>
-
 <head>
     <title>YouTube Remote</title>
     <meta http-equiv="content-type" content="text/html; charset=windows-1252">
@@ -14,6 +13,10 @@
         #peer-id {
             margin-bottom: 10px;
         }
+        
+        #password-field {
+            margin-bottom: 10px;
+        }
 
         .fireFix {
             height: 28px;
@@ -23,7 +26,6 @@
         }
     </style>
 </head>
-
 <body class="p-2">
     <div class="flex space-x-2 justify-center w-full text-nowrap mb-2 text-white">
         <p class="text-lg font-bold text-slate-100/80">Youtube Remote</p>
@@ -36,6 +38,13 @@
         <div id="id" style="height: 28px;"
             class="fireFix h-[28px] group-hover:text-white text-slate-100 py-[4px] px-2 rounded-md border border-white/10 transition w-full">
         </div>
+    </div>
+    <div class="mb-1 flex items-center group w-full" id="password-field">
+        <div class="fireFix h-[28px] mr-2 text-slate-100/60 py-[4px] px-4 rounded-md border border-white/10">
+            PW:
+        </div>
+        <input id="password" style="height: 28px; background-color: #1e1e1f;"
+            class="fireFix h-[28px] group-hover:text-white text-slate-100 py-[4px] px-2 rounded-md border border-white/10 transition w-full">
     </div>
     <!-- Toggle switch for Local Connection -->
     <div class="mb-4 flex items-center w-full">

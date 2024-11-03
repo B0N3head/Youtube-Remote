@@ -8,36 +8,59 @@ const validHosts = [
     "https://img.youtube.com/",
     "https://i3.ytimg.com/",
     "https://yt3.ggpht.com/",
-    "https://lh3.googleusercontent.com/"
+    "https://lh3.googleusercontent.com/",
 ];
 
 let youtubeNonStop = false;
-let nextButton, prevButton, pauseButton, muteButton, volumeSlider,
-    lastMetaTitle, lastPause, lastMute, lastVolume, mediaContData,
-    ipChecker, hashedIP, allowGlobalConnections, receivedPong, ytrVersion;
+let nextButton,
+    prevButton,
+    pauseButton,
+    muteButton,
+    volumeSlider,
+    lastMetaTitle,
+    lastPause,
+    lastMute,
+    lastVolume,
+    mediaContData,
+    ipChecker,
+    hashedIP,
+    allowGlobalConnections,
+    receivedPong,
+    ytrVersion;
 
 // Ahh yes, this is very readable
-const ytrLog = (message, err) => ytrDebug && (err ? (console.error(`[Youtube Remote] ${message}`, err), errorToast.showToast()) : console.log(`[Youtube Remote] ${message}`));
-
-const sendPeerData = (data) => conn && conn.open ? (conn.send(JSON.stringify(msgpack.encode(data))), ytrLog(`Sent: ${data}`)) : ytrLog("Connection is closed");
+const ytrLog = (message, err) =>
+    ytrDebug &&
+    (err
+        ? (console.error(`[Youtube Remote] ${message}`, err),
+            errorToast.showToast())
+        : console.log(`[Youtube Remote] ${message}`));
+const sendPeerData = (data) =>
+    conn && conn.open
+        ? (conn.send(msgpack.encode(data)),
+            ytrLog(`Sent: ${JSON.stringify(data)}`))
+        : ytrLog("Connection is closed");
+const getAttribute = (element, selector, attribute) =>
+    attribute
+        ? element.querySelector(selector)?.getAttribute(attribute) ?? ""
+        : element.querySelector(selector) ?? "";
 
 const generateNewID = (length) => {
     let result = "";
     for (let i = 0; i < length; i++)
         result += chars.charAt(Math.floor(Math.random() * chars.length));
     scriptSelf.id = result;
-}
-// ---------- Element_Hunt ---------- 
+};
+
+// ---------- Element_Hunt ----------
 const elementSearch = (id, name) => {
-    if (ytrDebug)
-        ytrLog(`Looking for ${id}`);
+    if (ytrDebug) ytrLog(`Looking for ${id}`);
     const elements = document.getElementsByClassName(id);
     if (elements.length > 0 && name.includes(elements[0].title)) {
-        if (ytrDebug)
-            ytrLog(`Found ${id}`);
+        if (ytrDebug) ytrLog(`Found ${id}`);
         return elements[0];
     }
-}
+};
 
 const findMediaControls = () => {
     /* 
@@ -45,7 +68,7 @@ const findMediaControls = () => {
         Could result in this extension breaking super quick (if any class names update)
         but I helps with compatibility with youtube-nonstop ¯\_(ツ)_/¯
     */
-    ytrLog(`Searching for ${isYTMusic ? "yt_music" : "ytd_app"} elements`)
+    ytrLog(`Searching for ${isYTMusic ? "yt_music" : "ytd_app"} elements`);
 
     nextButton = elementSearch(
         isYTMusic ? "next-button" : "ytp-next-button",
@@ -68,20 +91,20 @@ const findMediaControls = () => {
         isYTMusic ? "Volume" : "Volume"
     );
     return true;
-}
+};
 
 // Create separate functions for each button for PeerJS to call
 const nextSong = () => {
     if (nextButton === null) return;
     if (youtubeNonStop) lastInteractionTime = new Date().getTime();
     nextButton.click();
-}
+};
 
 const muteSong = () => {
     if (muteButton === null) return;
     if (youtubeNonStop) lastInteractionTime = new Date().getTime();
     muteButton.click();
-}
+};
 
 const prevSong = () => {
     if (prevButton === null) return;
@@ -89,9 +112,8 @@ const prevSong = () => {
     // Normal youtube.com video won't show prev button (unless in queue)
     if (!isYTMusic && prevButton.style.display === "none")
         window.history.back();
-    else
-        prevButton.click();
-}
+    else prevButton.click();
+};
 
 const pauseSong = () => {
     if (pauseButton === null) return;
@@ -107,9 +129,9 @@ const pauseSong = () => {
     //     if ((navigator.mediaSession.playbackState != "playing") && currentPlayState)
     //         document.getElementById(isYTMusic ? "song-media-window" : "movie_player").click();
     // }, 500);
-}
+};
 
-// ---------- PeerJS Server ---------- 
+// ---------- PeerJS Server ----------
 
 let lastPeerId = null;
 let peer = null;
@@ -121,16 +143,15 @@ const refuseConnection = (c) => {
         c.send(msgpack.encode(JSON.stringify({ type: "reject" })));
         setTimeout(() => c.close(), 500);
     });
-}
+};
 
 const setupConnection = (c) => {
     conn = c;
     ytrLog(`Connected to: ${conn.peer}`);
     connToast.showToast();
-
     conn.on("data", (data) => {
         try {
-            const message = JSON.parse(msgpack.decode(data));
+            const message = msgpack.decode(new Uint8Array(data));
             switch (message.type) {
                 case "next":
                     nextSong();
@@ -146,21 +167,29 @@ const setupConnection = (c) => {
                     break;
                 case "vol":
                     // Check if we are currently muted (if so then unmute then change the volume)
-                    if (isYTMusic ? muteButton.querySelector('path').getAttribute('d').startsWith('M3') : muteButton.title == "Unmute (m)")
+                    if (
+                        isYTMusic
+                            ? muteButton
+                                .querySelector("path")
+                                .getAttribute("d")
+                                .startsWith("M3")
+                            : muteButton.title == "Unmute (m)"
+                    )
                         muteSong();
 
-                    // Have to do this dynamically, as transitions between pages can mess with it 
+                    // Have to do this dynamically, as transitions between pages can mess with it
                     if (message.vol >= 0 && message.vol <= 100) {
                         if (youtubeNonStop) lastInteractionTime = Date.now();
-                        document.getElementsByClassName("html5-video-player")[0].setVolume(message.vol);
+                        document
+                            .getElementsByClassName("html5-video-player")[0]
+                            .setVolume(message.vol);
                     }
                     break;
                 case "ping":
                     sendPeerData({ type: "pong" });
                     break;
                 case "pong":
-                    if (message.id)
-                        receivedPong = (message.id == conn.peer); // Only accept the pong if the expected client is responding
+                    if (message.id) receivedPong = message.id == conn.peer; // Only accept the pong if the expected client is responding
                     break;
                 default:
                     ytrLog(`Unknown message: ${data}`);
@@ -182,17 +211,21 @@ const setupConnection = (c) => {
         // Send metadata to client
         sendClientMediaChanges(true);
     });
-}
+};
 
 const initPeerJS = () => {
     const peerId = scriptSelf.id;
     peer = new Peer(peerId, {
         config: {
-            'iceServers': [
-                { urls: 'stun:stun.l.google.com:19302' },
-                { urls: 'turn:turn.bistri.com:80', credential: 'homeo', username: 'homeo' } // hmmmmm...
-            ]
-        }
+            iceServers: [
+                { urls: "stun:stun.l.google.com:19302" },
+                {
+                    urls: "turn:turn.bistri.com:80",
+                    credential: "homeo",
+                    username: "homeo",
+                }, // hmmmmm...
+            ],
+        },
     });
 
     peer.on("open", (id) => {
@@ -202,37 +235,50 @@ const initPeerJS = () => {
     });
 
     peer.on("connection", (c) => {
-        if (hashedIP == null) // If we have not got our own IP we have serious issues, just stop
-        {
-            // better solution needed here
+        // Try to get our stored password
+        getPassword().then((storedPassword) => {
+            // If we do not have a set IP || the client's IP doesn't match ours AND we don't want global connections
+            if (hashedIP == null || (c.metadata.localID != hashedIP && !allowGlobalConnections)) {
+                // If the client has supplied a password and it matches our stored password then allow the connection
+                if (c.metadata.password && c.metadata.password === storedPassword) {
+                    setupConnection(c);
+                } else {
+                    refuseConnection(c, "Invalid password");
+                    return;
+                }
+            } else {
+                setupConnection(c);
+            }
+        }).catch((err) => {
+            ytrLog("Error parsing password", err);
             refuseConnection(c);
             return;
-        }
-
+        });
 
         // If our hashed IP doesn't match the clients and we don't want global connections then refuse
         if (c.metadata.localID != hashedIP && !allowGlobalConnections) {
             refuseConnection(c);
             return;
         }
-
-        // Check if our connection is still alive, replace if dead
+        
+        // Check if our connection is still alive then check if it's dead or the same client
         if (conn && conn.open) {
             // Old Peer is trying to manually reconnect (connect them back)
             if (conn.peer == c.peer) {
                 setupConnection(c);
             } else {
-                // Check if our client still exists  
-                // This is mainly for mobile devices with their [sleep-wake], as it doesn't send a .close and
-                // peerJS's .send on its own won't throw anything if the peer never responds
-                // It's a hacky way to do this as ping over 2500ms will cause a disconnect from any peer if a new peer attempts to connect
+                /*
+                    Check if our client still exists.
+                    This is mainly for mobile devices when they silently time out the connection during the device sleep/wake
+                    It's a hacky way to fix this, as ping over 2500ms will cause a disconnect from any peer if a new peer attempts to connect...
+                */
                 receivedPong = false;
                 sendPeerData({ type: "ping" });
                 setTimeout(() => {
-                    if (receivedPong) { // If our old client responded then we can ignore the new client
-                        refuseConnection(c);
+                    if (receivedPong) {
+                        refuseConnection(c); // If our old client responded then we can ignore the new client
                     } else {
-                        setupConnection(c);
+                        setupConnection(c); // Otherwise out with the old and in with the new
                     }
                 }, 2500);
             }
@@ -264,7 +310,7 @@ const initPeerJS = () => {
     });
 
     return true;
-}
+};
 
 const fetchImageAsBase64 = (artworkSRC) => {
     return new Promise((resolve, reject) => {
@@ -283,7 +329,7 @@ const fetchImageAsBase64 = (artworkSRC) => {
         xhr.responseType = "blob";
         xhr.send();
     });
-}
+};
 
 const sendClientMediaChanges = (forced) => {
     const currentMetadata = navigator.mediaSession.metadata;
@@ -292,15 +338,17 @@ const sendClientMediaChanges = (forced) => {
         let dataToSend = { type: "meta" };
 
         // Check if the song title has changed
-        if (forced || (currentMetadata.title != lastMetaTitle)) {
+        if (forced || currentMetadata.title != lastMetaTitle) {
             let currentMatch = null;
 
-            if (currentMetadata.artwork.length == 1) {    // Youtube (usually only has one thumb)  
+            if (currentMetadata.artwork.length == 1) {
+                // Youtube (usually only has one thumb)
                 currentMatch = currentMetadata.artwork[0].src;
-            }
-            else {  // YT Music (usually has 3-4)
+            } else {
+                // YT Music (usually has 3-4)
                 let top = 0;
-                currentMetadata.artwork.forEach(obj => { // Search though thumbnail images (try to limit size to 250px)
+                currentMetadata.artwork.forEach((obj) => {
+                    // Search though thumbnail images (try to limit size to 250px)
                     if (currentMatch == null) {
                         currentMatch = obj.src;
                     } else {
@@ -318,26 +366,29 @@ const sendClientMediaChanges = (forced) => {
 
             // If the thumbnail host is in our manifest file then we can send it as a url to options.js
             // Otherwise we base64 encode and send it (incase yt changes the thumbnail domains or I've missed one)
-            if (validHosts.some(validHost => currentMatch.startsWith(validHost))) {
+            if (
+                validHosts.some((validHost) =>
+                    currentMatch.startsWith(validHost)
+                )
+            ) {
                 dataToSend.artwork = currentMatch; // Will be a url
             } else {
                 fetchImageAsBase64(currentMatch)
-                    .then(base64Image => dataToSend.artwork = base64Image)
-                    .catch(err => {
+                    .then((base64Image) => (dataToSend.artwork = base64Image))
+                    .catch((err) => {
                         console.error(err);
                         errorToast.showToast();
                     });
             }
             // Keep track of the title for song changes
             lastMetaTitle = currentMetadata.title;
-        };
+        }
 
         // If we included the title then the next song is playing so we should update the queue
-        if (dataToSend.title)
-            dataToSend.queue = getCurrentQueue(false);
+        if (dataToSend.title) dataToSend.queue = getCurrentQueue(false);
 
         // Check though metadata if currently playing
-        const pauseFound = (navigator.mediaSession.playbackState == "playing")
+        const pauseFound = navigator.mediaSession.playbackState == "playing";
         if (forced || (pauseFound != lastPause && lastPause != null))
             dataToSend.playing = pauseFound;
         lastPause = pauseFound;
@@ -349,7 +400,12 @@ const sendClientMediaChanges = (forced) => {
         lastVolume = foundVolume;
 
         // (YTM) Check svg used by mute | (YT) Just check the title
-        const muteFound = isYTMusic ? muteButton.querySelector('path').getAttribute('d').startsWith('M3') : muteButton.title == "Unmute (m)";
+        const muteFound = isYTMusic
+            ? muteButton
+                .querySelector("path")
+                .getAttribute("d")
+                .startsWith("M3")
+            : muteButton.title == "Unmute (m)";
         if (forced || (muteFound != lastMute && lastMute != null))
             dataToSend.mute = muteFound;
         lastMute = muteFound;
@@ -362,7 +418,7 @@ const sendClientMediaChanges = (forced) => {
     } else {
         ytrDebug("No metadata to report on");
     }
-}
+};
 
 // Check every 2 sec for any changes that should be sent to the client
 const metadataCheckInterval = setInterval(() => {
@@ -371,7 +427,7 @@ const metadataCheckInterval = setInterval(() => {
     }
 }, 2000);
 
-// ---------- Misc ---------- 
+// ---------- Misc ----------
 const createToastTemplate = (text) => {
     return Toastify({
         text: text,
@@ -381,8 +437,8 @@ const createToastTemplate = (text) => {
             background: "rgb(30, 30, 31)",
             fontSize: "12px",
             fontFamily: '"Segoe UI", Tahoma, sans-serif',
-            boxShadow: "-5px 3px 7px 0px rgb(250 204 21 / 3%) inset"
-        }
+            boxShadow: "-5px 3px 7px 0px rgb(250 204 21 / 3%) inset",
+        },
     });
 };
 
@@ -392,9 +448,8 @@ const readyToast = createToastTemplate("YT-Remote - Ready");
 const errorToast = createToastTemplate("YT-Remote - Error [See console]");
 
 const elementWait = (selector) => {
-    return new Promise(resolve => {
-        if (document.querySelector(selector))
-            return resolve();
+    return new Promise((resolve) => {
+        if (document.querySelector(selector)) return resolve();
 
         const observer = new MutationObserver(() => {
             if (document.querySelector(selector)) {
@@ -404,11 +459,9 @@ const elementWait = (selector) => {
         });
         observer.observe(document.body, { childList: true, subtree: true });
     });
-}
+};
 
-const getAttribute = (element, selector, attribute) => attribute ? element.querySelector(selector)?.getAttribute(attribute) ?? '' : element.querySelector(selector) ?? '';
-
-let previousElements = [];
+/*
 const getCurrentQueue = (includeThumbnails) => {
     const songDetails = [];
     let refreshQueue = false;
@@ -427,7 +480,7 @@ const getCurrentQueue = (includeThumbnails) => {
             
             // Get all of our queued songs details
             queueItems.forEach(item => {
-                if () ## SAVE THE CURRENT QUEUE INTO AN ARRAY, CHECK ONLY NEW AND FIRST. SEND ALL NEW ITEMS TO CLIENT
+                if (*TODO*) // SAVE THE CURRENT QUEUE INTO AN ARRAY, CHECK ONLY NEW AND FIRST. SEND ALL NEW ITEMS TO CLIENT
                 const data = {
                     t: getAttribute(item, '.song-title', 'title'),
                     a: getAttribute(item, '.byline', 'title'),
@@ -530,18 +583,19 @@ const selectSongInQueue = (songTitle) => {
     }
     return songDetails;
 }
+*/
 
 // Try to get a hashed IP (to test local connections against)
 const attemptIpHash = () => {
     fetch("https://api.ipify.org?format=json")
-        .then(response => response.json())
-        .then(data => {
+        .then((response) => response.json())
+        .then((data) => {
             // Include current version as a "salt" (mainly to not allow mismatched local clients to connect)
             hashedIP = md5(data.ip + ytrVersion);
             clearInterval(ipChecker);
         })
-        .catch(err => ytrLog("Could not generate hashed IP", err));
-}
+        .catch((err) => ytrLog("Could not generate hashed IP", err));
+};
 
 // Listen for messages from content script
 window.addEventListener("message", (event) => {
@@ -558,36 +612,53 @@ window.addEventListener("message", (event) => {
     }
 });
 
+// Get the password from content.js
+const getPassword = () => {
+    return new Promise((resolve, reject) => {
+        const handleMessage = (event) => {
+            if (event.source !== window) return;
+            if (event.data.type === "ytrPasswordResponse") {
+                window.removeEventListener("message", handleMessage);
+                resolve(event.data.password);
+            }
+        };
+        window.addEventListener("message", handleMessage);
+        window.postMessage({ type: "ytrPasswordRequest" }, "*");
+    });
+};
+
 // Generate ID for popup to display
 generateNewID(6);
 
 // Wait for the player controls to exist
-elementWait(isYTMusic ? "ytmusic-player-bar" : ".ytp-chrome-controls").then(() => {
-    // If the browser is super slow (or super quick) PeerJS won't init in time, so wait for it to exist
-    const peerJSSanityCheck = setInterval(() => {
-        if (typeof Peer === "function") {
-            if (findMediaControls() && initPeerJS()) {
-                // Send request to our content.js for the current YTRemoteIsLocalConnectionOnly value
-                window.postMessage({ type: "ytrGlobalRequest" }, "*");
+elementWait(isYTMusic ? "ytmusic-player-bar" : ".ytp-chrome-controls").then(
+    () => {
+        // If the browser is super slow (or super quick) PeerJS won't init in time, so wait for it to exist
+        const peerJSSanityCheck = setInterval(() => {
+            if (typeof Peer === "function") {
+                if (findMediaControls() && initPeerJS()) {
+                    // Send request to our content.js for the current YTRemoteIsLocalConnectionOnly value
+                    window.postMessage({ type: "ytrGlobalRequest" }, "*");
 
-                // Check if a core variable used by YT-nonstop exists
-                youtubeNonStop = typeof lastInteractionTime !== "undefined";
-                if (youtubeNonStop)
-                    ytrLog("Enabled Youtube NonStop Compatibility");
+                    // Check if a core variable used by YT-nonstop exists
+                    youtubeNonStop = typeof lastInteractionTime !== "undefined";
+                    if (youtubeNonStop)
+                        ytrLog("Enabled Youtube NonStop Compatibility");
 
-                // Start to attempt to retrieve IP hash
-                ipChecker = setInterval(attemptIpHash, 2000);
+                    // Start to attempt to retrieve IP hash
+                    ipChecker = setInterval(attemptIpHash, 2000);
 
-                // Show that everything is good to go
-                readyToast.showToast();
-                ytrLog("Waiting for client connection");
-            } else {
-                // We don't want to check for metadata updates if we aren't able to serve clients
-                clearInterval(metadataCheckInterval);
+                    // Show that everything is good to go
+                    readyToast.showToast();
+                    ytrLog("Waiting for client connection");
+                } else {
+                    // We don't want to check for metadata updates if we aren't able to serve clients
+                    clearInterval(metadataCheckInterval);
+                }
+
+                // Remove self sanity check
+                clearInterval(peerJSSanityCheck);
             }
-
-            // Remove self sanity check
-            clearInterval(peerJSSanityCheck);
-        }
-    }, 1000);
-});
+        }, 1000);
+    }
+);
