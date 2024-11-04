@@ -12,38 +12,15 @@ const validHosts = [
 ];
 
 let youtubeNonStop = false;
-let nextButton,
-    prevButton,
-    pauseButton,
-    muteButton,
-    volumeSlider,
-    lastMetaTitle,
-    lastPause,
-    lastMute,
-    lastVolume,
-    mediaContData,
-    ipChecker,
-    hashedIP,
-    allowGlobalConnections,
-    receivedPong,
-    ytrVersion;
+let nextButton, prevButton, pauseButton, muteButton,
+    volumeSlider, lastMetaTitle, lastPause, lastMute,
+    lastVolume, mediaContData, ipChecker, hashedIP,
+    allowGlobalConnections, receivedPong, ytrVersion;
 
 // Ahh yes, this is very readable
-const ytrLog = (message, err) =>
-    ytrDebug &&
-    (err
-        ? (console.error(`[Youtube Remote] ${message}`, err),
-            errorToast.showToast())
-        : console.log(`[Youtube Remote] ${message}`));
-const sendPeerData = (data) =>
-    conn && conn.open
-        ? (conn.send(msgpack.encode(data)),
-            ytrLog(`Sent: ${JSON.stringify(data)}`))
-        : ytrLog("Connection is closed");
-const getAttribute = (element, selector, attribute) =>
-    attribute
-        ? element.querySelector(selector)?.getAttribute(attribute) ?? ""
-        : element.querySelector(selector) ?? "";
+const ytrLog = (message, err) => ytrDebug && (err ? (console.error(`[Youtube Remote] ${message}`, err), errorToast.showToast()) : console.log(`[Youtube Remote] ${message}`));
+const sendPeerData = (data) => conn && conn.open ? (conn.send(msgpack.encode(data)), ytrLog(`Sent: ${JSON.stringify(data)}`)) : ytrLog("Connection is closed");
+const getAttribute = (element, selector, attribute) => attribute ? element.querySelector(selector)?.getAttribute(attribute) ?? "" : element.querySelector(selector) ?? "";
 
 const generateNewID = (length) => {
     let result = "";
@@ -122,7 +99,7 @@ const pauseSong = () => {
     pauseButton.click();
 
     // YT and YTM will not autoplay sometimes in firefox .click() only updates UI and doesn't trigger media playback
-    // Will need to look further into this
+    // Will prob not look further into this as it seems ytm has a chokehold on this
 
     // // If we were paused 500ms ago and are still paused, then it must be a fresh yt page waiting for the init click
     // setTimeout(() => {
@@ -136,10 +113,10 @@ let lastPeerId = null;
 let peer = null;
 let conn = null;
 
-const refuseConnection = (c) => {
-    ytrLog(`Refusing connection from: ${c.peer}`);
+const refuseConnection = (c, reason) => {
+    ytrLog(`Refusing connection from: ${c.peer}`, reason);
     c.on("open", () => {
-        c.send(msgpack.encode(JSON.stringify({ type: "reject" })));
+        c.send(msgpack.encode({ type: "reject" }));
         setTimeout(() => c.close(), 500);
     });
 };
@@ -152,6 +129,11 @@ const setupConnection = (c) => {
         try {
             const message = msgpack.decode(new Uint8Array(data));
             switch (message.type) {
+                // case "seek":
+                //     const player = document.querySelector("video");
+                //     if (player)
+                //         player.currentTime = message.time;
+                //     break;
                 case "next":
                     nextSong();
                     break;
@@ -161,27 +143,19 @@ const setupConnection = (c) => {
                 case "pause":
                     pauseSong();
                     break;
-                case "mute": // This is unused...
+                case "mute": // This is unused rn...
                     muteSong();
                     break;
                 case "vol":
                     // Check if we are currently muted (if so then unmute then change the volume)
-                    if (
-                        isYTMusic
-                            ? muteButton
-                                .querySelector("path")
-                                .getAttribute("d")
-                                .startsWith("M3")
-                            : muteButton.title == "Unmute (m)"
-                    )
+                    if (isYTMusic ? muteButton.querySelector("path").getAttribute("d").startsWith("M3") : muteButton.title == "Unmute (m)")
                         muteSong();
 
                     // Have to do this dynamically, as transitions between pages can mess with it
                     if (message.vol >= 0 && message.vol <= 100) {
                         if (youtubeNonStop) lastInteractionTime = Date.now();
-                        document
-                            .getElementsByClassName("html5-video-player")[0]
-                            .setVolume(message.vol);
+                        // Set the volume from the "html5-video-player" element, as setting it from "video" is only cosmetic for some reason
+                        document.getElementsByClassName("html5-video-player")[0].setVolume(message.vol);
                     }
                     break;
                 case "ping":
@@ -212,6 +186,34 @@ const setupConnection = (c) => {
     });
 };
 
+const connectPeer = (c) => {
+    // Check if our connection is still alive then check if it's dead or the same client
+    if (conn && conn.open) {
+        // Old Peer is trying to manually reconnect (connect them back)
+        if (conn.peer == c.peer) {
+            setupConnection(c);
+        } else {
+            /*
+                Check if our client still exists.
+                This is mainly for mobile devices when they silently time out the connection during the device sleep/wake
+                It's a hacky way to fix this, as ping over 2500ms will cause a disconnect from any peer if a new peer attempts to connect...
+            */
+            receivedPong = false;
+            sendPeerData({ type: "ping" });
+            setTimeout(() => {
+                if (receivedPong) {
+                    refuseConnection(c); // If our old client responded then we can ignore the new client
+                } else {
+                    setupConnection(c); // Otherwise out with the old and in with the new
+                }
+            }, 2500);
+        }
+    } else {
+        // If we don't have a connection then set it up
+        setupConnection(c);
+    }
+}
+
 const initPeerJS = () => {
     const peerId = scriptSelf.id;
     peer = new Peer(peerId, {
@@ -233,59 +235,38 @@ const initPeerJS = () => {
         ytrLog(`Peer ID: ${peer.id}`);
     });
 
-    //**NOT FINISHED**
+
+    // Never trust the client!
     peer.on("connection", (c) => {
         // Try to get our stored password
-        getPassword().then((storedPassword) => {
-            // If we do not have a set IP || the client's IP doesn't match ours AND we don't want global connections
-            if (hashedIP == null || (c.metadata.localID != hashedIP && !allowGlobalConnections)) {
-                // If the client has supplied a password and it matches our stored password then allow the connection
-                if (c.metadata.password && c.metadata.password === storedPassword) {
-                    setupConnection(c);
+        reqLocalStorageData({ type: "ytrPasswordREQ" }).then((storedPassword) => {
+            console.log(storedPassword)
+            if (hashedIP != null && c.metadata.localID == hashedIP) {
+                // Everything is working as inteded, check ip and passwords as normal
+                if (allowGlobalConnections) {
+                    if (c.metadata.password && c.metadata.password === storedPassword)
+                        connectPeer(c);
+                    else
+                        refuseConnection(c, "Invalid password");
                 } else {
-                    refuseConnection(c, "Invalid password");
-                    return;
+                    connectPeer(c);
                 }
             } else {
-                setupConnection(c);
+                // Either our IP api's are down or something is wrong with the client
+                if (allowGlobalConnections) {
+                    if (c.metadata.password && c.metadata.password === storedPassword)
+                        connectPeer(c); // global connections allowed and the password is correct
+                    else
+                        refuseConnection(c, "Invalid password");
+                } else {
+                    refuseConnection(c, "Global connections are disabled");
+                }
             }
         }).catch((err) => {
             ytrLog("Error parsing password", err);
             refuseConnection(c);
             return;
         });
-
-        // If our hashed IP doesn't match the clients and we don't want global connections then refuse
-        if (c.metadata.localID != hashedIP && !allowGlobalConnections) {
-            refuseConnection(c);
-            return;
-        }
-
-        // Check if our connection is still alive then check if it's dead or the same client
-        if (conn && conn.open) {
-            // Old Peer is trying to manually reconnect (connect them back)
-            if (conn.peer == c.peer) {
-                setupConnection(c);
-            } else {
-                /*
-                    Check if our client still exists.
-                    This is mainly for mobile devices when they silently time out the connection during the device sleep/wake
-                    It's a hacky way to fix this, as ping over 2500ms will cause a disconnect from any peer if a new peer attempts to connect...
-                */
-                receivedPong = false;
-                sendPeerData({ type: "ping" });
-                setTimeout(() => {
-                    if (receivedPong) {
-                        refuseConnection(c); // If our old client responded then we can ignore the new client
-                    } else {
-                        setupConnection(c); // Otherwise out with the old and in with the new
-                    }
-                }, 2500);
-            }
-        } else {
-            // If we don't have a connection then set it up
-            setupConnection(c);
-        }
     });
 
     peer.on("disconnected", () => {
@@ -378,9 +359,6 @@ const sendClientMediaChanges = (forced) => {
             lastMetaTitle = currentMetadata.title;
         }
 
-        // If we included the title then the next song is playing so we should update the queue
-        if (dataToSend.title) dataToSend.queue = getCurrentQueue(false);
-
         // Check though metadata if currently playing
         const pauseFound = navigator.mediaSession.playbackState == "playing";
         if (forced || (pauseFound != lastPause && lastPause != null))
@@ -392,6 +370,14 @@ const sendClientMediaChanges = (forced) => {
         if (forced || (foundVolume != lastVolume && lastVolume != null))
             dataToSend.volume = foundVolume;
         lastVolume = foundVolume;
+
+        // // Current progress of media
+        // const foundProgress = document.querySelector("video");
+        // if (forced || (foundProgress.currentTime != lastProgress && lastProgress != null)) {
+        //     dataToSend.mediaTime = foundProgress.currentTime;
+        //     dataToSend.mediaDuration = foundProgress.duration;
+        // }
+        // lastProgress = foundProgress.currentTime;
 
         // (YTM) Check svg used by mute | (YT) Just check the title
         const muteFound = isYTMusic
@@ -416,9 +402,8 @@ const sendClientMediaChanges = (forced) => {
 
 // Check every 2 sec for any changes that should be sent to the client
 const metadataCheckInterval = setInterval(() => {
-    if (conn && conn.open) {
-        //sendClientMediaChanges();
-    }
+    if (conn && conn.open)
+        sendClientMediaChanges();
 }, 2000);
 
 // ---------- Misc ----------
@@ -444,7 +429,6 @@ const errorToast = createToastTemplate("YT-Remote - Error [See console]");
 const elementWait = (selector) => {
     return new Promise((resolve) => {
         if (document.querySelector(selector)) return resolve();
-
         const observer = new MutationObserver(() => {
             if (document.querySelector(selector)) {
                 resolve();
@@ -467,36 +451,38 @@ const attemptIpHash = () => {
         .catch((err) => ytrLog("Could not generate hashed IP", err));
 };
 
-// Listen for messages from content script
-window.addEventListener("message", (event) => {
-    if (event.source !== window) return;
-    if (event.data.type) {
-        switch (event.data.type) {
-            case "ytrGlobalResponse": // On globalConnections local storage value being changed
-                allowGlobalConnections = event.data.info;
-                break;
-            case "ytrVersionResponse": // Content.js sending the manifest version number
-                ytrVersion = event.data.info;
-                break;
-        }
+// Listen for update messages from content.js
+document.addEventListener("contentScriptEvent", (event) => {
+    const message = event.detail;
+    if (message.type === "ytrGlobalResponse") {
+        allowGlobalConnections = !message.payloady;
+        ytrLog(`Global connections updated: ${allowGlobalConnections}`);
     }
 });
 
-// Get the password from content.js
-const getPassword = () => {
+// Request data from content.js
+const reqLocalStorageData = (message) => {
     return new Promise((resolve, reject) => {
-        const handleMessage = (event) => {
-            if (event.source !== window) return;
-            if (event.data.type === "ytrPasswordResponse") {
-                window.removeEventListener("message", handleMessage);
-                resolve(event.data.password);
+        const requestId = `${Date.now()}${Math.random()}`;
+        message.requestId = requestId;
+        const handleResponse = (event) => {
+            if (event.detail && event.detail.responseId === requestId) {
+                document.removeEventListener("contentScriptResponse", handleResponse);
+                if (event.detail.error) {
+                    reject(event.detail.error);
+                } else {
+                    resolve(event.detail.payload);
+                }
             }
         };
-        window.addEventListener("message", handleMessage);
-        window.postMessage({ type: "ytrPasswordRequest" }, "*");
+        document.addEventListener("contentScriptResponse", handleResponse);
+        document.dispatchEvent(new CustomEvent("contentScriptRequest", { detail: message }));
+        setTimeout(() => {  // set a timeout to reject if no response is received
+            document.removeEventListener("contentScriptResponse", handleResponse);
+            reject("Timeout waiting for response");
+        }, 5000);
     });
 };
-
 // Generate ID for popup to display
 generateNewID(6);
 
@@ -507,8 +493,18 @@ elementWait(isYTMusic ? "ytmusic-player-bar" : ".ytp-chrome-controls").then(
         const peerJSSanityCheck = setInterval(() => {
             if (typeof Peer === "function") {
                 if (findMediaControls() && initPeerJS()) {
-                    // Send request to our content.js for the current YTRemoteIsLocalConnectionOnly value
-                    window.postMessage({ type: "ytrGlobalRequest" }, "*");
+                    // Send request to our content.js for some storage.local values
+                    reqLocalStorageData({ type: "ytrGlobalConnREQ" })
+                        .then((value) => {
+                            allowGlobalConnections = value;
+                            ytrLog(`Initial global connections setting: ${allowGlobalConnections}`);
+                        }).catch((err) => ytrLog("Error getting global connections setting", err));
+
+                    reqLocalStorageData({ type: "ytrVersionREQ" })
+                        .then((version) => {
+                            ytrVersion = version;
+                            ytrLog(`YTRemote version: ${ytrVersion}`);
+                        }).catch((err) => ytrLog("Error getting version", err));
 
                     // Check if a core variable used by YT-nonstop exists
                     youtubeNonStop = typeof lastInteractionTime !== "undefined";

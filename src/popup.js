@@ -29,7 +29,8 @@ document.addEventListener('DOMContentLoaded', () => {
           writeToLocalStorage({ YTRemoteLastDisplayedKey: response.peerID });
           idElement.classList.replace('text-slate-100', 'text-yellow-400');
         } else {
-          idElement.textContent = 'Please reopen';
+          // Only shows if tab isn't ready or ytremote has been killed
+          idElement.textContent = 'Please reopen/refresh';
         }
       });
     } else {

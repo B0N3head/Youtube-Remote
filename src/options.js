@@ -17,10 +17,11 @@ const nextButton = document.getElementById("nextButton");
 const pauseButton = document.getElementById("pauseButton");
 const prevButton = document.getElementById("prevButton");
 const volumeSlider = document.getElementById("volumeSlide");
+//const progressBar = document.getElementById('progressBar');
 
 // Misc
 let ipChecker, hashedIP, serverIsMuted, connectionPassword, wakeLock;
-let currentUNIX = 0, lastSuccessUNIX = 0;
+let currentUNIX = 0, lastSuccessUNIX = 0, songDuration = 0;
 let ytrDebug = true, receivedPong = false;
 const isMobileDevice = () => /Mobi|Android/i.test(navigator.userAgent);
 const waitIconElement = document.getElementById("waitIcon");
@@ -41,8 +42,7 @@ const links = {
 };
 
 const ytrLog = (message, err) => ytrDebug && (err ? console.error(`[Youtube Remote] ${message}`, err) : console.log(`[Youtube Remote] ${message}`));
-
-const sendPeerData = (data) => conn && conn.open ? (conn.send(JSON.stringify(msgpack.encode(data))), ytrLog(`Sent: ${data}`)) : ytrLog("Connection is closed");
+const sendPeerData = (data) => conn && conn.open ? (conn.send(msgpack.encode(data)), ytrLog(`Sent: ${JSON.stringify(data)}`)) : ytrLog("Connection is closed");
 
 const connectionTimeout = {
   start(timeoutMS) {
@@ -90,7 +90,7 @@ const connectToYTServer = () => {
 
   // Attempt to connect
   conn = peer.connect(idInputElement.value.toLowerCase(), {
-    metadata: { localID: hashedIP },
+    metadata: { localID: hashedIP, password: connectionPassword },
     reliable: true
   });
 
@@ -112,45 +112,51 @@ const connectToYTServer = () => {
     }
   });
 
-  console.log("a");
-  // Handle incoming data (messages only since this is the signal sender)
-  conn.on("data", (inputData) => {
-    const data = msgpack.decode(new Uint8Array(inputData));
-    ytrLog(`Rec: ${data}`);
+  // Handle incoming data
+  conn.on("data", (data) => {
+    const message = msgpack.decode(new Uint8Array(data));
+    ytrLog(`Received: ${JSON.stringify(data)}`);
     // Used for checking client pulse (no pong as the ping would error + we don"t care about latency)
-    const connDataJson = JSON.parse(data);
-    switch (connDataJson.type) {
+    switch (message.type) {
       case "meta":
         // No switch / ifelse tree as we want to check each part (not all data objects are sent all the time)
-        if (connDataJson.time < currentUNIX) // Ignore old data
+        if (message.time < currentUNIX) // Ignore old data
           return;
-
-        currentUNIX = connDataJson.time;
+        currentUNIX = message.time; // Update current time (for comparison with next data)
 
         // Update media controls
         // If the server has messed with the player state, then we send updates to the client in an attempt to keep them synced
-        if (connDataJson.hasOwnProperty("playing")) {
-          pauseButton.dataset.state = connDataJson.playing ? "playing" : "paused";
+        if (message.hasOwnProperty("playing")) {
+          pauseButton.dataset.state = message.playing ? "playing" : "paused";
           updateButtonUI();
         }
 
-        if (connDataJson.hasOwnProperty("mute")) {
-          serverIsMuted = connDataJson.mute;
+        if (message.hasOwnProperty("mute")) {
+          serverIsMuted = message.mute;
           volumeSlide.value = 0;
         }
 
-        if (connDataJson.hasOwnProperty("volume") && !serverIsMuted) // Don't change volume if server is currently muted
-          volumeSlide.value = connDataJson.volume;
+        // if (message.hasOwnProperty('mediaDuration')) {
+        //   songDuration = message.mediaDuration;
+        //   progressBar.value = (message.mediaTime / songDuration) * 100;
+        // }
+
+        // Don't change volume if server is currently muted
+        if (message.hasOwnProperty("volume") && !serverIsMuted)
+          volumeSlide.value = message.volume;
 
         // Media metadata
-        if (connDataJson.title)
-          htmlTitle.innerHTML = connDataJson.title;
+        if (message.title) {
+          htmlTitle.innerHTML = message.title;
 
-        if (connDataJson.artist)
-          htmlArtist.innerHTML = connDataJson.artist;
+          document.title = `YouTube Remote - ${message.title}`;
+        }
 
-        if (connDataJson.artwork != null)
-          htmlArtwork.src = connDataJson.artwork;
+        if (message.artist)
+          htmlArtist.innerHTML = message.artist;
+
+        if (message.artwork != null)
+          htmlArtwork.src = message.artwork;
         break;
       case "accept":  // Server accepted the connection request
         connectionTimeout.cancel();
@@ -164,7 +170,7 @@ const connectToYTServer = () => {
         setTimeout(() => { statusText.innerHTML = "Ready"; resetUI(); }, 4000);
         break;
       case "ping":
-        sendPeerData(JSON.stringify({ type: "pong", id: peer.id }));
+        sendPeerData({ type: "pong", id: peer.id });
         break;
       case "pong": // No ID check as we could only receive from an already connected server
         receivedPong = true;
@@ -178,7 +184,7 @@ const connectToYTServer = () => {
   conn.on("close", () => {
     // Check if our client still exists (false closes happen a lot with mobile connections)
     receivedPong = false;
-    conn.send(JSON.stringify({ type: "ping" }));
+    conn.send({ type: "ping" });
     setTimeout(() => {
       if (receivedPong) { // YTServer is still responding client has not been closed
         statusText.innerHTML = "Reconnected to " + conn.peer.toUpperCase();
@@ -209,20 +215,23 @@ const runOnLoad = () => {
   }).catch((err) => ytrLog("Something went wrong accessing LastUsedKey", err));
 
   // -------- PeerJS Setup --------
-
   setupPeerJSPeer();
   document.getElementById("connectButton").addEventListener("click", () => connectToYTServer());
 
   // -------- Event Listeners --------
-
-  prevButton.addEventListener("click", () => sendPeerData(JSON.stringify({ type: "prev" })));
+  prevButton.addEventListener("click", () => sendPeerData({ type: "prev" }));
+  nextButton.addEventListener("click", () => sendPeerData({ type: "next" }));
   pauseButton.addEventListener("click", () => {
-    sendPeerData(JSON.stringify({ type: "pause" }))
+    sendPeerData({ type: "pause" })
     // Ping pong the play/pause state (UI is client side but is updated when the player responds on play state change)
     pauseButton.dataset.state = (pauseButton.dataset.state === "playing") ? "paused" : "playing";
     updateButtonUI();
   });
-  nextButton.addEventListener("click", () => sendPeerData(JSON.stringify({ type: "next" })));
+
+  // progressBar.addEventListener('input', () => {
+  //   const seekTime = (progressBar.value / 100) * songDuration;
+  //   sendPeerData({ type: 'seek', time: seekTime });
+  // });
 
   chrome.storage.local.get(['YTRemotePassword']).then((result) => {
     connectionPassword = result.YTRemotePassword || '';
@@ -235,15 +244,13 @@ const runOnLoad = () => {
   });
 
   // Mobile slider support (uses touchend, instead of mouseup)
-  if (isMobileDevice()) {
-    ['mouseup', 'touchend'].forEach(function (e) {
-      volumeSlider.addEventListener(e, () => {
-        // easeInOutSine volume slider [desmos func -\left(\cos\left(0.01\pi x\right)-1\right)*50]
-        const volume = volumeSlider.value != 0 ? -(Math.cos(Math.PI * 0.01 * volumeSlider.value) - 1) * 50 : 0;
-        sendPeerData(JSON.stringify({ type: "vol", vol: volume }));
-      });
+  ['mouseup', 'touchend'].forEach(function (e) {
+    volumeSlider.addEventListener(e, () => {
+      sendPeerData({ type: "vol", vol: volumeSlider.value });
     });
+  });
 
+  if (isMobileDevice()) {
     preventSleepToggle.addEventListener('change', async (event) => {
       const target = event.target;
       const isChecked = target.checked;
@@ -284,7 +291,7 @@ const runOnLoad = () => {
 
   // Change all references to the version to load from the manifest file
   document.getElementById("version").innerHTML = `v${chrome.runtime.getManifest().version}`;
-  document.title = `YouTube Remote v${chrome.runtime.getManifest().version}`;
+  document.title = `YouTube Remote - v${chrome.runtime.getManifest().version}`;
 }
 
 const setupPeerJSPeer = () => {
@@ -403,7 +410,7 @@ const resetUI = () => {
   htmlTitle.innerHTML = "Nothing";
   htmlArtist.innerHTML = "The silence is deafening";
   htmlArtwork.src = "";
-  loading(false);
+  showLoading(false);
 }
 
 const scriptInject = (_script, _className) => {

@@ -23,21 +23,55 @@ const scriptInject = (_script, _className) => {
 
 // When our remote connections var changes notify our server manager on the change
 const notifyRemote = () => {
-    chrome.storage.local.get(['YTRemoteIsLocalConnectionOnly']).then((value) => {
-        if (Object.keys(value).length == 1)
-            window.postMessage({ type: "ytrGlobalResponse", info: value.YTRemoteIsLocalConnectionOnly });
-        else // Do not allow remote connections if 'YTRemoteIsLocalConnectionOnly' isn't set
-            window.postMessage({ type: "ytrGlobalResponse", info: false });
+    chrome.storage.local.get('YTRemoteIsLocalConnectionOnly', (result) => {
+        const value = result.YTRemoteIsLocalConnectionOnly || false;
+        document.dispatchEvent(new CustomEvent('contentScriptResponse', {
+            detail: {
+                type: 'ytrGlobalResponse',
+                payload: value
+            }
+        }));
     });
 }
 
-// When requested, return the local storage value of our set password
-const returnRemoteKey = () => {
-    chrome.storage.local.get(['YTRemotePassword']).then((result) => {
-        const password = result.YTRemotePassword || '';
-        window.postMessage({ type: "ytrPasswordResponse", password: password });
-    });
-}
+// Listener for data requests (ytRemote.js)
+document.addEventListener('contentScriptRequest', (event) => {
+    const message = event.detail;
+    if (!message.type || !message.requestId) return;
+    switch (message.type) {
+        case 'ytrPasswordREQ':
+            chrome.storage.local.get('YTRemotePassword', (result) => {
+                const password = result.YTRemotePassword || '';
+                document.dispatchEvent(new CustomEvent('contentScriptResponse', {
+                    detail: {
+                        responseId: message.requestId,
+                        payload: password
+                    }
+                }));
+            });
+            break;
+        case 'ytrVersionREQ':
+            const version = chrome.runtime.getManifest().version;
+            document.dispatchEvent(new CustomEvent('contentScriptResponse', {
+                detail: {
+                    responseId: message.requestId,
+                    payload: version
+                }
+            }));
+            break;
+        case 'ytrGlobalConnREQ':
+            chrome.storage.local.get('YTRemoteIsLocalConnectionOnly', (result) => {
+                const value = result.YTRemoteIsLocalConnectionOnly || false;
+                document.dispatchEvent(new CustomEvent('contentScriptResponse', {
+                    detail: {
+                        responseId: message.requestId,
+                        payload: value
+                    }
+                }));
+            });
+            break;
+    }
+});
 
 // INJECT ALL THE SCRIPTS (should prob make this smaller)
 scriptInject(chrome.runtime.getURL('libs/toastifyjs.js'), "toastifyjs").then(() => {        // Toast notifications for connections
@@ -46,7 +80,7 @@ scriptInject(chrome.runtime.getURL('libs/toastifyjs.js'), "toastifyjs").then(() 
             scriptInject(chrome.runtime.getURL('libs/msgpack.js'), "msgpack").then(() => {  // For making our data smaller  
                 scriptInject(chrome.runtime.getURL('libs/ytRemote.js'), "ytremotescript").then((ytRemoteCreated) => { // Main script
                     ytRemote = ytRemoteCreated;
-
+                    console.log(`[Youtube Remote] Running on page`);
                     // Watch for our popup.js to call for our ID (only run if we have injected ytRemote)
                     chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                         if (message.action === 'getID')
@@ -54,18 +88,6 @@ scriptInject(chrome.runtime.getURL('libs/toastifyjs.js'), "toastifyjs").then(() 
                     });
                     // Setup listener for when 'YTRemoteIsLocalConnectionOnly' changes
                     chrome.storage.local.onChanged.addListener(notifyRemote);
-
-                    // Fires on ytRemote.js request (when a new connection comes in we double check the var)
-                    window.addEventListener("message", (event) => {
-                        if (event.source !== window) return;
-                        if (event.data.type && event.data.type === "ytrGlobalRequest")
-                            notifyRemote();
-                        if (event.data.type && event.data.type === "ytrPasswordRequest")
-                            returnRemoteKey();
-                    });
-
-                    // Send the version number to ytRemote.js (also serves as a sanity check)
-                    window.postMessage({ type: "ytrVersionResponse", info: chrome.runtime.getManifest().version });
                 }).catch(error => console.error(`${_className} failed to inject into page:\n${error}`));
             }).catch(error => console.error(`${_className} failed to inject into page:\n${error}`));
         }).catch(error => console.error(`${_className} failed to inject into page:\n${error}`));
