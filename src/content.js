@@ -15,65 +15,62 @@ const scriptInject = (_script, _className) => {
         script.src = _script;
         if (_className)
             script.className = _className;
-        script.addEventListener('load', resolve(script));
-        script.addEventListener('error', e => reject(e.error, _className));
+        script.addEventListener('load', () => resolve(script));
+        script.addEventListener('error', (e) => reject(e.error || e));
         (document.documentElement || document.head).appendChild(script);
     });
 }
 
-// When our remote connections var changes notify our server manager on the change
+// When our remote connections var changes, notify our server manager on the change
 const notifyRemote = () => {
     chrome.storage.local.get('YTRemoteIsLocalConnectionOnly', (result) => {
         const value = result.YTRemoteIsLocalConnectionOnly || false;
-        document.dispatchEvent(new CustomEvent('contentScriptResponse', {
-            detail: {
-                type: 'ytrGlobalResponse',
-                payload: value
-            }
-        }));
+        window.postMessage({
+            sender: 'contentScript',
+            type: 'ytrGlobalResponse',
+            payload: value
+        }, '*');
     });
 }
 
-// Listener for data requests (ytRemote.js)
-document.addEventListener('contentScriptRequest', (event) => {
-    const message = event.detail;
+// Listener for data requests from ytRemote.js
+window.addEventListener('message', (event) => {
+    if (event.source !== window || !event.data || event.data.sender !== 'ytRemote') return;
+    const message = event.data;
     if (!message.type || !message.requestId) return;
     switch (message.type) {
         case 'ytrPasswordREQ':
             chrome.storage.local.get('YTRemotePassword', (result) => {
                 const password = result.YTRemotePassword || '';
-                document.dispatchEvent(new CustomEvent('contentScriptResponse', {
-                    detail: {
-                        responseId: message.requestId,
-                        payload: password
-                    }
-                }));
+                window.postMessage({
+                    sender: 'contentScript',
+                    responseId: message.requestId,
+                    payload: password
+                }, '*');
             });
             break;
         case 'ytrVersionREQ':
             const version = chrome.runtime.getManifest().version;
-            document.dispatchEvent(new CustomEvent('contentScriptResponse', {
-                detail: {
-                    responseId: message.requestId,
-                    payload: version
-                }
-            }));
+            window.postMessage({
+                sender: 'contentScript',
+                responseId: message.requestId,
+                payload: version
+            }, '*');
             break;
         case 'ytrGlobalConnREQ':
             chrome.storage.local.get('YTRemoteIsLocalConnectionOnly', (result) => {
                 const value = result.YTRemoteIsLocalConnectionOnly || false;
-                document.dispatchEvent(new CustomEvent('contentScriptResponse', {
-                    detail: {
-                        responseId: message.requestId,
-                        payload: value
-                    }
-                }));
+                window.postMessage({
+                    sender: 'contentScript',
+                    responseId: message.requestId,
+                    payload: value
+                }, '*');
             });
             break;
     }
 });
 
-// INJECT ALL THE SCRIPTS (should prob make this smaller)
+// INJECT ALL THE SCRIPTS (should probably make this smaller)
 scriptInject(chrome.runtime.getURL('libs/toastifyjs.js'), "toastifyjs").then(() => {        // Toast notifications for connections
     scriptInject(chrome.runtime.getURL('libs/md5.js'), "md5js").then(() => {                // To hash client IP
         scriptInject(chrome.runtime.getURL('libs/peerjs.js'), "peerjs").then(() => {        // For p2p connections
@@ -88,8 +85,8 @@ scriptInject(chrome.runtime.getURL('libs/toastifyjs.js'), "toastifyjs").then(() 
                     });
                     // Setup listener for when 'YTRemoteIsLocalConnectionOnly' changes
                     chrome.storage.local.onChanged.addListener(notifyRemote);
-                }).catch(error => console.error(`${_className} failed to inject into page:\n${error}`));
-            }).catch(error => console.error(`${_className} failed to inject into page:\n${error}`));
-        }).catch(error => console.error(`${_className} failed to inject into page:\n${error}`));
-    }).catch(error => console.error(`${_className} failed to inject into page:\n${error}`));
-}).catch(error => console.error(`${_className} failed to inject into page:\n${error}`));
+                }).catch(error => console.error(`ytRemote.js failed to inject into page:\n${error}`));
+            }).catch(error => console.error(`msgpack.js failed to inject into page:\n${error}`));
+        }).catch(error => console.error(`peerjs.js failed to inject into page:\n${error}`));
+    }).catch(error => console.error(`md5.js failed to inject into page:\n${error}`));
+}).catch(error => console.error(`toastifyjs.js failed to inject into page:\n${error}`));

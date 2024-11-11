@@ -18,7 +18,7 @@ let nextButton, prevButton, pauseButton, muteButton,
     allowGlobalConnections, receivedPong, ytrVersion;
 
 // Ahh yes, this is very readable
-const ytrLog = (message, err) => ytrDebug && (err ? (console.error(`[Youtube Remote] ${message}`, err), errorToast.showToast()) : console.log(`[Youtube Remote] ${message}`));
+const ytrLog = (message, err) => ytrDebug && (err ? (console.warn(`[Youtube Remote] ${message}`, err), errorToast.showToast()) : console.log(`[Youtube Remote] ${message}`));
 const sendPeerData = (data) => conn && conn.open ? (conn.send(msgpack.encode(data)), ytrLog(`Sent: ${JSON.stringify(data)}`)) : ytrLog("Connection is closed");
 const getAttribute = (element, selector, attribute) => attribute ? element.querySelector(selector)?.getAttribute(attribute) ?? "" : element.querySelector(selector) ?? "";
 
@@ -98,10 +98,7 @@ const pauseSong = () => {
     if (youtubeNonStop) lastInteractionTime = new Date().getTime();
     pauseButton.click();
 
-    // YT and YTM will not autoplay sometimes in firefox .click() only updates UI and doesn't trigger media playback
-    // Will prob not look further into this as it seems ytm has a chokehold on this
-
-    // // If we were paused 500ms ago and are still paused, then it must be a fresh yt page waiting for the init click
+    // YT and YTM autoplay is disabled in browser on firefox, you need to disable it in settings
     // setTimeout(() => {
     //     if ((navigator.mediaSession.playbackState != "playing") && currentPlayState)
     //         document.getElementById(isYTMusic ? "song-media-window" : "movie_player").click();
@@ -240,7 +237,6 @@ const initPeerJS = () => {
     peer.on("connection", (c) => {
         // Try to get our stored password
         reqLocalStorageData({ type: "ytrPasswordREQ" }).then((storedPassword) => {
-            console.log(storedPassword)
             if (hashedIP != null && c.metadata.localID == hashedIP) {
                 // Everything is working as inteded, check ip and passwords as normal
                 if (allowGlobalConnections) {
@@ -452,11 +448,12 @@ const attemptIpHash = () => {
 };
 
 // Listen for update messages from content.js
-document.addEventListener("contentScriptEvent", (event) => {
-    const message = event.detail;
+window.addEventListener("message", (event) => {
+    if (event.source !== window || !event.data || event.data.sender !== 'contentScript') return;
+    const message = event.data;
     if (message.type === "ytrGlobalResponse") {
-        allowGlobalConnections = !message.payloady;
-        ytrLog(`Global connections updated: ${allowGlobalConnections}`);
+        allowGlobalConnections = message.payload;
+        ytrLog(`allowGlobalConnections: ${allowGlobalConnections}`);
     }
 });
 
@@ -465,24 +462,27 @@ const reqLocalStorageData = (message) => {
     return new Promise((resolve, reject) => {
         const requestId = `${Date.now()}${Math.random()}`;
         message.requestId = requestId;
+        message.sender = 'ytRemote'; // Identify the sender
         const handleResponse = (event) => {
-            if (event.detail && event.detail.responseId === requestId) {
-                document.removeEventListener("contentScriptResponse", handleResponse);
-                if (event.detail.error) {
-                    reject(event.detail.error);
+            if (event.source !== window || !event.data || event.data.sender !== 'contentScript') return;
+            if (event.data && event.data.responseId === requestId) {
+                window.removeEventListener("message", handleResponse);
+                if (event.data.error) {
+                    reject(event.data.error);
                 } else {
-                    resolve(event.detail.payload);
+                    resolve(event.data.payload);
                 }
             }
         };
-        document.addEventListener("contentScriptResponse", handleResponse);
-        document.dispatchEvent(new CustomEvent("contentScriptRequest", { detail: message }));
+        window.addEventListener("message", handleResponse);
+        window.postMessage(message, "*");
         setTimeout(() => {  // set a timeout to reject if no response is received
-            document.removeEventListener("contentScriptResponse", handleResponse);
+            window.removeEventListener("message", handleResponse);
             reject("Timeout waiting for response");
         }, 5000);
     });
 };
+
 // Generate ID for popup to display
 generateNewID(6);
 
@@ -497,7 +497,7 @@ elementWait(isYTMusic ? "ytmusic-player-bar" : ".ytp-chrome-controls").then(
                     reqLocalStorageData({ type: "ytrGlobalConnREQ" })
                         .then((value) => {
                             allowGlobalConnections = value;
-                            ytrLog(`Initial global connections setting: ${allowGlobalConnections}`);
+                            ytrLog(`Initial allowGlobalConnections: ${allowGlobalConnections}`);
                         }).catch((err) => ytrLog("Error getting global connections setting", err));
 
                     reqLocalStorageData({ type: "ytrVersionREQ" })
