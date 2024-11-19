@@ -1,6 +1,6 @@
 const isYTMusic = window.location.hostname === "music.youtube.com";
 const scriptSelf = document.getElementsByClassName("ytremotescript")[0];
-const chars = "abcdefghjklmnopqrstuvwxyz";
+const chars = "abcdefghjklmnopqrstuvwxyz123456"; // silly people could confuse I as l (even though no lowercase are used) so just remove "i"
 let ytrDebug = true; // changed by user during runtime via console
 
 const validHosts = [
@@ -17,7 +17,7 @@ let nextButton, prevButton, pauseButton, muteButton,
     lastVolume, mediaContData, ipChecker, hashedIP,
     allowGlobalConnections, receivedPong, ytrVersion;
 
-// Ahh yes, this is very readable
+// Ahh yes, very readable
 const ytrLog = (message, err) => ytrDebug && (err ? (console.warn(`[Youtube Remote] ${message}`, err), errorToast.showToast()) : console.log(`[Youtube Remote] ${message}`));
 const sendPeerData = (data) => conn && conn.open ? (conn.send(msgpack.encode(data)), ytrLog(`Sent: ${JSON.stringify(data)}`)) : ytrLog("Connection is closed");
 const getAttribute = (element, selector, attribute) => attribute ? element.querySelector(selector)?.getAttribute(attribute) ?? "" : element.querySelector(selector) ?? "";
@@ -98,7 +98,7 @@ const pauseSong = () => {
     if (youtubeNonStop) lastInteractionTime = new Date().getTime();
     pauseButton.click();
 
-    // YT and YTM autoplay is disabled in browser on firefox, you need to disable it in settings
+    // YT and YTM autoplay is disabled browser wide on firefox, you need to enable it in settings
     // setTimeout(() => {
     //     if ((navigator.mediaSession.playbackState != "playing") && currentPlayState)
     //         document.getElementById(isYTMusic ? "song-media-window" : "movie_player").click();
@@ -367,7 +367,7 @@ const sendClientMediaChanges = (forced) => {
             dataToSend.volume = foundVolume;
         lastVolume = foundVolume;
 
-        // // Current progress of media
+        // // Current progress of media (native client to update time, estimate sync)
         // const foundProgress = document.querySelector("video");
         // if (forced || (foundProgress.currentTime != lastProgress && lastProgress != null)) {
         //     dataToSend.mediaTime = foundProgress.currentTime;
@@ -505,15 +505,12 @@ elementWait(isYTMusic ? "ytmusic-player-bar" : ".ytp-chrome-controls").then(
                             ytrVersion = version;
                             ytrLog(`YTRemote version: ${ytrVersion}`);
                         }).catch((err) => ytrLog("Error getting version", err));
-
                     // Check if a core variable used by YT-nonstop exists
                     youtubeNonStop = typeof lastInteractionTime !== "undefined";
                     if (youtubeNonStop)
                         ytrLog("Enabled Youtube NonStop Compatibility");
-
                     // Start to attempt to retrieve IP hash
                     ipChecker = setInterval(attemptIpHash, 2000);
-
                     // Show that everything is good to go
                     readyToast.showToast();
                     ytrLog("Waiting for client connection");
@@ -521,7 +518,6 @@ elementWait(isYTMusic ? "ytmusic-player-bar" : ".ytp-chrome-controls").then(
                     // We don't want to check for metadata updates if we aren't able to serve clients
                     clearInterval(metadataCheckInterval);
                 }
-
                 // Remove self sanity check
                 clearInterval(peerJSSanityCheck);
             }
