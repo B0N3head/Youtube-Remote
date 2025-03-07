@@ -14,6 +14,94 @@
             padding: 0;
             background-color: #09090b;
         }
+
+        ::-webkit-scrollbar {
+            width: 10px;
+            height: 10px;
+        }
+
+        ::-webkit-scrollbar-track {
+            border-radius: 100vh;
+            background: #141415;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #2c2c2d;
+            border-radius: 100vh;
+            border: 3px solid #141415;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #444446;
+        }
+
+        .progressBar {
+            -webkit-appearance: none;
+            appearance: none;
+            height: 100%;
+            position: absolute;
+            background: transparent;
+            width: 100%;
+            top: 0px;
+            outline: none;
+            opacity: 0.2;
+            overflow: hidden;
+        }
+
+        .progressBar::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 1px;
+            height: 100%;
+            cursor: pointer;
+        }
+
+        .progressBar::-moz-range-thumb {
+            width: 1px;
+            height: 100%;
+            cursor: pointer;
+        }
+
+        .progressBar::-webkit-slider-thumb {
+            box-shadow: -407px 0 0 400px #ffffff;
+        }
+
+        .progressBar::-moz-range-thumb {
+            box-shadow: -407px 0 0 400px #ffffff;
+        }
+
+        @media only screen and (max-width: 600px) {
+            body {
+                padding: 10px;
+            }
+            
+            .text-3xl {
+                font-size: 1.5rem;
+            }
+            
+            .p-8 {
+                padding: 1rem;
+            }
+            
+            .space-x-4 > * {
+                margin-right: 0.5rem;
+            }
+            
+            .size-8 {
+                width: 1.5rem;
+                height: 1.5rem;
+            }
+        }
+
+        @media (hover: none) {
+            button:active {
+                background-color: rgba(255, 255, 255, 0.1);
+            }
+            
+            input[type="range"] {
+                height: 30px; /* Larger touch target */
+            }
+        }
     </style>
 </head>
 
@@ -25,14 +113,35 @@
                 <h1 class="text-3xl font-bold mb-1 text-slate-100">YouTube Remote</h1>
                 <b id="version" class="text-xs text-slate-100/10 font"></b>
             </div>
-            <p class="mb-4 text-slate-100/40">Control Youtube clients on your network</p>
+            <p class="mb-4 text-slate-100/40">Control Youtube clients on any network!!!</p>
             <div class="mb-2 flex items-center group">
                 <div for="recID"
                     class="h-[42px] mr-2 bg-[#18181B]/50 backdrop-blur-lg text-slate-100/30 py-2 px-4 rounded-md border border-white/10 transition">
                     <p class="group-hover:text-white font-medium transition text-slate-100/40 text-base/6">ID:</p>
                 </div>
-                <input type="text" id="recID" title="YouTube Remote ID"
+                <input type="text" id="recID" style="text-transform: uppercase" title="YouTube Remote ID"
                     class="h-[42px] text-slate-100 text-base/6 placeholder:text-zinc-500 font-medium p-2 w-full rounded-md border border-white/10 text-slate-100 shadow-sm hover:ring-1 hover:ring-white/10 focus:ring-1 focus:ring-white/10 transition appearance-none rounded-lg focus:outline-none bg-[#18181B]/50 backdrop-blur-lg">
+            </div>
+            <div class="mb-2 flex items-center group">
+                <div for="password"
+                    class="h-[42px] mr-2 bg-[#18181B]/50 backdrop-blur-lg text-slate-100/30 py-2 px-4 rounded-md border border-white/10 transition">
+                    <p class="group-hover:text-white font-medium transition text-slate-100/40 text-base/6">PW:</p>
+                </div>
+                <input id="password" title="*Not required for local connections*"
+                    class="h-[42px] text-slate-100 text-base/6 placeholder:text-zinc-500 font-medium p-2 w-full rounded-md border border-white/10 text-slate-100 shadow-sm hover:ring-1 hover:ring-white/10 focus:ring-1 focus:ring-white/10 transition appearance-none rounded-lg focus:outline-none bg-[#18181B]/50 backdrop-blur-lg">
+            </div>
+            <div class="mb-2 flex items-center w-full" id="preventSleepMenu" style="display: none;">
+                <input id="preventSleepToggle" type="checkbox" class="sr-only">
+                <label for="preventSleepToggle" class="relative inline-flex items-center cursor-pointer mr-2">
+                    <div class="w-[49px] h-[28px] bg-zinc-800 rounded-md transition-colors duration-200 ease-in-out">
+                    </div>
+                    <span style="background-color: #af3939"
+                        class="absolute left-[2px] w-6 h-5 transition-all rounded-md duration-200 ease-in-out transform translate-x-5"></span>
+                </label>
+                <div
+                    class="h-[28px] group-hover:text-white text-slate-100 py-[4px] px-2 rounded-md border border-white/10 transition w-full">
+                    <label id="preventSleepText" class="text-gray-400 ">Stop Mobile Sleep *experimental*</label>
+                </div>
             </div>
             <button id="connectButton"
                 class="group flex items-center justify-center text-white py-2 px-4 rounded-md w-full bg-[#18181B]/50 backdrop-blur-lg font-bold border border-white/10 text-slate-100 shadow-sm hover:bg-white/10 hover:ring-1 hover:ring-white/10 transition">
@@ -55,12 +164,14 @@
                 </div>
             </button>
         </div>
-        <div class="bg-[#1e1e1f] text-slate-100 p-8 rounded-b-[25px] shadow-lg w-110 mt-2"
-            style="background-size: 100% 100%;background-position: 0px 0px,0px 0px,0px 0px;background-image: radial-gradient(33% 43% at 5% 93%, #ffffff08 7%, #073AFF00 100%);">
-            <div class="container mb-4 bg-[#141415] rounded-md border border-white/10" style="height: 200px;">
+        <div class="bg-[#1e1e1f] text-slate-100 p-8 rounded-b-[25px] shadow-lg mt-2">
+            <div class="container mb-4 bg-[#141415] rounded-md border border-white/10"
+                style="height: 200px;position: relative;">
                 <img id="artwork"
                     style="height: 100%;object-fit: contain;display: block;margin-left: auto;margin-right: auto;"
                     src="">
+                <!-- <input type="range" id="progressBar" min="0" max="100" value="0"
+                    class="rounded-md w-full accent-[#fff] progressBar"> -->
             </div>
             <div style="width: 400px;">
                 <p id="title" style="font-size: large;width: fit-content;">Nothing</p>
@@ -112,6 +223,16 @@
             <p id="status" class="text-center font-bold text-slate-100/40 mt-2 select-none">Plz wait</p>
         </div>
     </div>
+    <div class="mt-4 -mb-3">
+        <div class="not-prose relative bg-slate-50 rounded-xl overflow-hidden dark:bg-slate-800/25">
+            <div style="background-position:10px 10px"
+                class="absolute inset-0 bg-grid-slate-100 [mask-image:linear-gradient(0deg,#fff,rgba(255,255,255,0.6))] dark:bg-grid-slate-700/25 dark:[mask-image:linear-gradient(0deg,rgba(255,255,255,0.1),rgba(255,255,255,0.5))]">
+            </div>
+
+            <div class="absolute inset-0 pointer-events-none border border-black/5 rounded-xl dark:border-white/5">
+            </div>
+        </div>
+    </div>
     <div style="display: none;" id="mainCredits">
         <div class="fixed z-[1] w-full h-full overflow-auto bg-black bg-zinc-950/80 backdrop-blur-lg left-0 top-0"
             id="mainCredits">
@@ -119,7 +240,12 @@
                 <div class="p-4 flex ">
                     <div class="bg-[#1e1e1f] text-slate-100 p-2 rounded-[25px] shadow-lg border border-white/10">
                         <div class="p-4">
-                            <div class="space-y-4 mb-4 text-slate-100/80">
+                            <div class="space-y-4 mb-4">
+                                <div class="w-full flex justify-center">
+                                    <p class="text-nowrap font-medium">
+                                        Created by
+                                    </p>
+                                </div>
                                 <div id="boneCredit">
                                     <div
                                         class="inline-flex items-center justify-between w-full p-5 hover:text-white transition bg-[#18181B]/50 hover:bg-[#141415] rounded-lg cursor-pointer">
@@ -154,12 +280,16 @@
                                         </div>
                                     </div>
                                 </div>
+                                <div class="w-full flex justify-center">
+                                    <p class="text-nowrap font-medium">
+                                        Powered by
+                                    </p>
+                                </div>
                                 <div class="inline-flex">
                                     <div id="peerCredit" class="flex items-center">
                                         <div
                                             class="inline-flex items-center justify-between py-5 px-6 hover:text-white transition bg-[#18181B]/50 hover:bg-[#141415] rounded-lg cursor-pointer">
                                             <div>
-
                                                 <img alt="PEER JS"
                                                     src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAGQAAABkCAYAAABw4pVUAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAAMTSURBVHhe7dw7axRRAAXgWUWNEh8QwWdjIwEb7URB7cVC8QF2Iv4BUazsLeKPsNVCsRGsYmGKgJpKUoppDGihSHwQo+fMndFxve7O7N4NZ/R8cNh7M5sQ5mRm57GbzMzMzMzMzMzMzOxfcxNZQA7nM1i8dHqB4fjawcnxYj5bLLvCOb5+spjPcc5xBecvw1DTmuJR0TZkL7IhnwWcM8TfneNd+SzLxhHON+WzLNuNlM8tcb4nDDV1ikdFt5GryAnkCb+Av/4tfJyam/9wZOf2DrIZ0xXMP2LZeozHZt68XUKWMeeyDp/L7yl8Rzjfms+sERbCFXg8n6XBn/c+DDUp77JK0whXJFPuvsp5rxxAqPo1eW0o5L/iQsS4EDEuRExbC7mL3A/DP8wgXC59NNVG5WFvNdWTRJ6TdC9nziFV3ct92JvQY4SHwXVwC6r7XBltK+QYUvdE8SiS8qRyVfhFXYwLEeNCxLgQS6buYW+reAsRo3iDaiOyLwx/033rlVtI7CTvPHIvDH/i3UPegaxaQl6FofXCe+ixXdEhpKrJLmsZ6X4eL7HIadMu6xmyLgwbeYqsDUMbxN+2EOYrUr2edQrhrmcF4VZwB6l6hMR+DiO5hSjqVUiZG0gvk8hnJPa9ZVxITXUKKTOPsBy+kF9GHiBfkNhzu+NCampSyDDxi7r150LEuBAxLkSMCxHjQsS4EDGKhfAMezUsFo/WB69VxU7kUuciIkf1AzufkLEwHBleAeZFSSmqryG3isdR4fUuuTKU8Q8ltptJlTOINfQCia3MFFH+bKWsHUhsZQ6bKcQGxEPT2EodJjaE/UhspQ6ah4i0NuxLeR99kDc3xPCfCvCQWlYbLp2keific0S6jDaJva+qaSYQS+Q6ElvJdfMOscRiK7pueHBgiZ1FYiu7X/J/XNMWbTtj5ZXgC0id14NvCN+n9TqfmZmZ/eKPtNnouRAxLkSMCxHjQsS4EDEuRIwLEeNCxLgQMS5EjAsR40LEuBAxLkSMCxHjQsS4EDEuRIwLMTMzMzMzMzMzMzNLLMt+ACinpQGSXBeaAAAAAElFTkSuQmCC"
                                                     class="inline-block h-14 w-14 rounded-md" />
@@ -201,12 +331,32 @@
                                         </div>
                                     </div>
                                 </div>
+                                <div class="space-x-2 flex flex-row w-full justify-center" style="margin-top: 0.5rem;">
+                                    <div id="md5Credit" class="w-full">
+                                        <div
+                                            class="w-full inline-flex items-center justify-between py-4 px-6 hover:text-white transition bg-[#18181B]/50 hover:bg-[#141415] rounded-lg cursor-pointer">
+                                            <div
+                                                class="w-full font-semibold flex items-center justify-center space-x-1">
+                                                <p>JavaScript-MD5</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div id="msgpackCredit" class="w-full">
+                                        <div
+                                            class="w-full inline-flex items-center justify-between py-4 px-6 hover:text-white transition bg-[#18181B]/50 hover:bg-[#141415] rounded-lg cursor-pointer">
+                                            <div
+                                                class="w-full font-semibold flex items-center justify-center space-x-1">
+                                                <p>msgpack-lite</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                         <div class="w-full flex justify-center">
                             <button id="closeCredits" type="button"
                                 class="text-nowrap font-medium text-zinc-500 hover:text-zinc-200 transition">
-                                close credits
+                                Close Credits
                             </button>
                         </div>
                     </div>

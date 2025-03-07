@@ -1,25 +1,36 @@
-console.log(`[Youtube Remote v${chrome.runtime.getManifest().version}]`);
+const ytrVersion = chrome.runtime.getManifest().version;
+console.log(`[Youtube Remote v${ytrVersion}]`);
+
+let ytrDebug = false;
+const ytrlog = (message) => ytrDebug && console.log(`[Youtube Remote] ${message}`);
+
+const versionElement = document.getElementById("version");
+const localConnToggle = document.getElementById('localConnectionToggle'); // Local storage trigger for the ui Toggle 
+const localConnText = document.getElementById('localConnectionText'); // Local storage trigger for the ui Toggle 
+const idElement = document.getElementById('id');
+const passwordInputElement = document.getElementById("password");
 
 document.addEventListener('DOMContentLoaded', () => {
-  document.getElementById("version").innerHTML = `v${chrome.runtime.getManifest().version}`;
-  document.title = `YouTube Remote v${chrome.runtime.getManifest().version}`;
+  const toggleLabel = localConnToggle ? localConnToggle.nextElementSibling : null;
 
-  const versionElement = document.getElementById("version").innerHTML;
+  // Update extension version
+  versionElement.innerHTML = `v${ytrVersion}`;
+  document.title = `YouTube Remote v${ytrVersion}`;
 
   chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
     if (tabs.length && tabs[0].url.includes('youtube.com')) {
       chrome.tabs.sendMessage(tabs[0].id, { action: 'getID' }, (response) => {
         // Suppress throwing "Unchecked runtime.lastError" if the tab isn't ready
         if (chrome.runtime.lastError)
-          console.log("[Youtube Remote] Tab not ready");
+          ytrlog("Tab not ready");
 
-        const idElement = document.getElementById('id');
         if (response) {
           idElement.textContent = response.peerID;
-          idElement.className = "h-[28px] group-hover:text-white text-yellow-400 py-[4px] px-2 rounded-md border border-white/10 transition w-full";
+          writeToLocalStorage({ YTRemoteLastDisplayedKey: response.peerID });
+          idElement.classList.replace('text-slate-100', 'text-yellow-400');
         } else {
-          idElement.textContent = 'Please reopen';
-          idElement.className = "h-[28px] group-hover:text-white text-slate-100 py-[4px] px-2 rounded-md border border-white/10 transition w-full";
+          // Only shows if tab isn't ready or ytremote has been killed
+          idElement.textContent = 'Please reopen/refresh';
         }
       });
     } else {
@@ -27,84 +38,49 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
-  // Implemented a local storage trigger for the ui Toggle 
-  const toggleElement = document.getElementById('local-connection-toggle');
-  
-  const toggleLabel = toggleElement ? toggleElement.nextElementSibling : null;
-
-  // Display extension version
-  if (versionElement) {
-    versionElement.innerHTML = `v${chrome.runtime.getManifest().version}`;
-    document.title = `YouTube Remote v${chrome.runtime.getManifest().version}`;
-  }
-
   // Initialise the toggle switch state based on local storage
-  if (toggleElement) {
-    readFromLocalStorage('YTRemote_isLocalConnectionOnly').then((value) => {
-      toggleElement.checked = (value === 'true');
-      updateToggleSwitchUI(toggleElement, toggleLabel);
+  chrome.storage.local.get(['YTRemoteIsLocalConnectionOnly']).then((value) => {
+    localConnToggle.checked = value.YTRemoteIsLocalConnectionOnly;
+    updateToggleSwitchUI(localConnToggle.checked, toggleLabel);
+    ytrlog(`Connection mode is: ${localConnToggle.checked ? "global" : "local"}`);
+  }).catch((error) => {
+    console.error("Error reading from local storage:", error);
+  });
 
-      if (value === 'true') {
-        console.log("[Youtube Remote] Local Connection Only mode is active.");
-      } else if (value === 'false')
-      {
-        console.log("[Youtube Remote] Local Connection Only mode is inactive.");
-      }
+  // Initialise the set password
+  chrome.storage.local.get(['YTRemotePassword']).then((result) => {
+    passwordInputElement.value = result.YTRemotePassword || '';
+  });
+
+  // Add listener for toggle switch changes
+  localConnToggle.addEventListener('change', (event) => {
+    const isChecked = event.target.checked;
+    writeToLocalStorage({ YTRemoteIsLocalConnectionOnly: isChecked }).then(() => {
+      updateToggleSwitchUI(localConnToggle.checked, toggleLabel);
+      // Can never be null as its added to toggleElement at runtime (won't be added if it can't be found)
+      ytrlog(`Connection mode is: ${isChecked ? "global" : "local"}`);
     }).catch((error) => {
-      console.error("Error reading from local storage:", error);
+      console.error("Error writing to local storage:", error);
     });
+  });
 
-    // Add listener for toggle switch changes
-    toggleElement.addEventListener('change', (event) => {
-      const isChecked = event.target.checked;
-      writeToLocalStorage('YTRemote_isLocalConnectionOnly', isChecked.toString()).then(() => {
-        updateToggleSwitchUI(toggleElement, toggleLabel);
-        
-        if (isChecked) {
-          console.log("[Youtube Remote] Local Connection Only mode is active.");
-        } else if (!isChecked)
-        {
-          console.log("[Youtube Remote] Local Connection Only mode is inactive.");
-        }
-
-      }).catch((error) => {
-        console.error("Error writing to local storage:", error);
-      });
-    });
-  } else {
-    console.error("Toggle element not found.");
-  }
+  // Write changes to our password value as they are changed
+  passwordInputElement.addEventListener("change", () => {
+    const password = passwordInputElement.value;
+    writeToLocalStorage({ YTRemotePassword: password });
+  });
 
   document.getElementById('open-options').addEventListener('click', () => {
     chrome.runtime.openOptionsPage();
   });
 });
 
-
-// TODO:
-// - Read/Write YTRemote_isLocalConnectionOnly from local storage (done)
-// - Create toggle to effect this value in popup.html (done)
-// - Create listeners in yt_remote and options for if this value changes
-
-
-// Read from local storage
-const readFromLocalStorage = (key) => {
+const writeToLocalStorage = (data) => {
   return new Promise((resolve, reject) => {
     try {
-      const value = localStorage.getItem(key);
-      resolve(value);
-    } catch (error) {
-      reject(error);
-    }
-  });
-};
-
-// Write to local storage
-const writeToLocalStorage = (key, value) => {
-  return new Promise((resolve, reject) => {
-    try {
-      localStorage.setItem(key, value);
-      resolve();
+      chrome.storage.local.set(data).then(() => {
+        resolve();
+      });
     } catch (error) {
       reject(error);
     }
@@ -112,21 +88,17 @@ const writeToLocalStorage = (key, value) => {
 };
 
 // Update the toggle switch UI
-const updateToggleSwitchUI = (toggleElement, toggleLabel) => {
-  if (toggleLabel) {
-    const isChecked = toggleElement.checked;
-    if (isChecked) {
-      toggleLabel.querySelector('div').classList.replace('bg-zinc-800', 'bg-zinc-600');
-      toggleLabel.querySelector('span').classList.replace('translate-x-0', 'translate-x-5');
-      toggleLabel.querySelector('span').classList.replace('bg-zinc-700', 'bg-zinc-500');
-    } else {
-      toggleLabel.querySelector('div').classList.replace('bg-zinc-600', 'bg-zinc-800');
-      toggleLabel.querySelector('span').classList.replace('translate-x-5', 'translate-x-0');
-      toggleLabel.querySelector('span').classList.replace('bg-zinc-500', 'bg-zinc-700');
-    }
+const updateToggleSwitchUI = (toggled, toggleLabel) => {
+  if (toggled) {
+    toggleLabel.querySelector('span').classList.replace('translate-x-0', 'translate-x-5');
+    toggleLabel.querySelector('span').style.background = "#af3939";
+    localConnText.innerHTML = "Global Connections Allowed";
+  } else {
+    toggleLabel.querySelector('span').classList.replace('translate-x-5', 'translate-x-0');
+    toggleLabel.querySelector('span').style.background = "#63a757";
+    localConnText.innerHTML = "Only Local Connections";
   }
 };
-
 
 // tailwindcss 3.4.5
 (() => {

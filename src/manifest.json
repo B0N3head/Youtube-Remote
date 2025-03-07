@@ -1,8 +1,16 @@
 {
   "name": "YouTube Remote",
   "short_name": "YT Remote",
-  "version": "1.0.2",
-  "description": "Control Youtube clients on your network",
+  "version": "2.0.4",
+  "description": "Control ANY youtube player on ANY network!!!",
+  "host_permissions": [
+    "https://api.ipify.org/",
+    "https://i.ytimg.com/",
+    "https://img.youtube.com/",
+    "https://i3.ytimg.com/",
+    "https://yt3.ggpht.com/",
+    "https://lh3.googleusercontent.com/"
+  ],
   "permissions": [
     "tabs",
     "storage"
@@ -22,11 +30,11 @@
   "web_accessible_resources": [
     {
       "resources": [
-        "yt_remote.js"
+        "libs/*.js"
       ],
       "matches": [
-        "https://www.youtube.com/*",
-        "https://music.youtube.com/*"
+        "http://*/*",
+        "https://*/*"
       ]
     }
   ],
