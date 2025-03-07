@@ -1,9 +1,11 @@
 <h1 align="center">
-Youtube Remote v1.0.1
+Youtube Remote v2.0.4
 </h1>
 <p align="center">
 <a>Control <b>any</b> youtube client from any device on <b>your local network</b></a></br>
-<sub><a href="https://github.com/B0N3head/Youtube-Remote/tree/main-dev">Currently undergoing a <b>full rewrite</b> allowing for global connections + much more</a></sub>
+<h3 align="center">
+Now with global connection support*
+</h3>
 </p>
 
 <p align="center">
@@ -14,9 +16,12 @@ Youtube Remote v1.0.1
 
 ***
 
-Designed and tested with:
-- music.youtube.com
-- youtube.com
+###### *requires server to use a password if using global connections
+
+### Designed and tested with:
+- music.youtube.com - (*Firefox/Chrome/Edge*)
+- youtube.com -  (*Firefox/Chrome/Edge*)
+
 
 <img src="https://github.com/user-attachments/assets/fed96993-6ae0-4cc3-997d-72bb06cbced0"/>
 
