@@ -6,7 +6,6 @@ Youtube Remote v2.0.4
 <h3 align="center">
 Now with global connection support*
 </h3>
-</p>
 
 <p align="center">
 <a href="https://addons.mozilla.org/en-GB/firefox/addon/youtube-remote/"><img src="https://github.com/user-attachments/assets/b3c51aa7-0064-47dd-939d-e5440854d1f6" alt="Get Youtube Remote for Firefox"></a>
@@ -21,7 +20,6 @@ Now with global connection support*
 ### Designed and tested with:
 - music.youtube.com - (*Firefox/Chrome/Edge*)
 - youtube.com -  (*Firefox/Chrome/Edge*)
-
 
 <img src="https://github.com/user-attachments/assets/fed96993-6ae0-4cc3-997d-72bb06cbced0"/>
 
