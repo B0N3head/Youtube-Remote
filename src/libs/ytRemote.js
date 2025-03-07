@@ -266,10 +266,29 @@ const initPeerJS = () => {
     });
 
     peer.on("disconnected", () => {
-        ytrLog("Connection disconnect. (silently) attempt to reconnect");
-        peer.id = lastPeerId;
-        peer._lastServerId = lastPeerId;
+        ytrLog("Connection lost. Attempting reconnection");
+        
+        // Try immediate reconnection
         peer.reconnect();
+        
+        // If that fails, try again with increasing backoff
+        let reconnectAttempts = 0;
+        const maxReconnectAttempts = 5;
+        const reconnectInterval = setInterval(() => {
+            if (peer.disconnected && reconnectAttempts < maxReconnectAttempts) {
+                ytrLog(`Reconnect attempt ${reconnectAttempts + 1}/${maxReconnectAttempts}`);
+                peer.reconnect();
+                reconnectAttempts++;
+            } else {
+                clearInterval(reconnectInterval);
+                
+                // If still disconnected after all attempts, reset
+                if (peer.disconnected) {
+                    ytrLog("Failed to reconnect after multiple attempts");
+                    errorToast.showToast();
+                }
+            }
+        }, 3000); // Attempt every 3 seconds
     });
 
     peer.on("close", () => {
@@ -482,6 +501,53 @@ const reqLocalStorageData = (message) => {
         }, 5000);
     });
 };
+
+// Improved mobile sleep detection
+function catchMobileSleep() {
+    if (!isMobileDevice()) return null; // Only run on mobile devices
+    
+    let lastTime = Date.now();
+    let interval = setInterval(() => {
+        const currentTime = Date.now();
+        const timeDifference = currentTime - lastTime;
+        
+        // If device woke from sleep (time difference > 5 seconds)
+        if (timeDifference > 5000) {
+            ytrLog(`Device woke from sleep after ${Math.round(timeDifference/1000)}s, attempting reconnection`);
+            
+            // Check if connection is still alive
+            if (conn) {
+                sendPeerData({ type: "ping" });
+                
+                // Wait for response, reconnect if no response
+                setTimeout(() => {
+                    if (!receivedPong) {
+                        ytrLog("No response from client, reconnecting...");
+                        conn.close();
+                        conn = null;
+                        peer.reconnect();
+                    }
+                }, 1000);
+            }
+        }
+        
+        lastTime = currentTime;
+    }, 2000);
+    
+    return interval;
+}
+
+// Helper function to check if device is mobile
+function isMobileDevice() {
+    return /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+}
+
+// Initialize mobile sleep detection
+let mobileSleepInterval = null;
+if (isMobileDevice()) {
+    ytrLog("Mobile device detected, initializing sleep detection");
+    mobileSleepInterval = catchMobileSleep();
+}
 
 // Generate ID for popup to display
 generateNewID(6);

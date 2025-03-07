@@ -69,6 +69,39 @@
         .progressBar::-moz-range-thumb {
             box-shadow: -407px 0 0 400px #ffffff;
         }
+
+        @media only screen and (max-width: 600px) {
+            body {
+                padding: 10px;
+            }
+            
+            .text-3xl {
+                font-size: 1.5rem;
+            }
+            
+            .p-8 {
+                padding: 1rem;
+            }
+            
+            .space-x-4 > * {
+                margin-right: 0.5rem;
+            }
+            
+            .size-8 {
+                width: 1.5rem;
+                height: 1.5rem;
+            }
+        }
+
+        @media (hover: none) {
+            button:active {
+                background-color: rgba(255, 255, 255, 0.1);
+            }
+            
+            input[type="range"] {
+                height: 30px; /* Larger touch target */
+            }
+        }
     </style>
 </head>
 

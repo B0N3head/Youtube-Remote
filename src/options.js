@@ -254,27 +254,82 @@ const runOnLoad = () => {
     preventSleepToggle.addEventListener('change', async (event) => {
       const target = event.target;
       const isChecked = target.checked;
+
       if (isChecked) {
         try {
+          // Visual feedback
           target.parentElement.querySelector('span').classList.replace('translate-x-5', 'translate-x-0');
           target.parentElement.querySelector('span').style.background = "#63a757";
-          wakeLock = await navigator.wakeLock.request('screen');
-          preventSleepText.innerHTML = "Disabled Mobile Sleep";
-          wakeLock.addEventListener('release', () => {
-            preventSleepToggle.checked = false;
-            preventSleepText.innerHTML = "Enabled Mobile Sleep";
-          });
+
+          // Request wake lock with fallback options
+          try {
+            wakeLock = await navigator.wakeLock.request('screen');
+            preventSleepText.innerHTML = "Mobile Sleep Disabled";
+
+            // Handle wake lock release
+            wakeLock.addEventListener('release', () => {
+              preventSleepToggle.checked = false;
+              preventSleepText.innerHTML = "Mobile Sleep Enabled";
+              target.parentElement.querySelector('span').classList.replace('translate-x-0', 'translate-x-5');
+              target.parentElement.querySelector('span').style.background = "#af3939";
+            });
+
+            // Periodically refresh wake lock to ensure it remains active
+            const wakeLockInterval = setInterval(() => {
+              if (wakeLock && preventSleepToggle.checked) {
+                wakeLock.release().then(async () => {
+                  wakeLock = await navigator.wakeLock.request('screen');
+                }).catch(err => {
+                  ytrLog('Error refreshing wake lock', err);
+                });
+              } else {
+                clearInterval(wakeLockInterval);
+              }
+            }, 30000); // Refresh every 30 seconds
+
+          } catch (err) {
+            // Fallback for browsers without wake lock API
+            ytrLog('Wake Lock API not supported, using fallback', err);
+            preventSleepText.innerHTML = "Using fallback sleep prevention";
+
+            // Create a video element to prevent sleep
+            const sleepVideo = document.createElement('video');
+            sleepVideo.id = 'sleepPrevention';
+            sleepVideo.style.display = 'none';
+            sleepVideo.setAttribute('playsinline', '');
+            sleepVideo.setAttribute('muted', '');
+            sleepVideo.setAttribute('loop', '');
+            sleepVideo.innerHTML = '<source src="data:video/mp4;base64,AAAAIGZ0eXBpc29tAAACAGlzb21pc28yYXZjMW1wNDEAAAAIZnJlZQAAAxBtZGF0AAACoAYF//+c3EXpvebZSLeWLNgg2SPu73gyNjQgLSBjb3JlIDE1MiAtIEguMjY0L01QRUctNCBBVkMgY29kZWMgLSBDb3B5bGVmdCAyMDAzLTIwMTcgLSBodHRwOi8vd3d3LnZpZGVvbGFuLm9yZy94MjY0Lmh0bWwgLSBvcHRpb25zOiBjYWJhYz0xIHJlZj0zIGRlYmxvY2s9MTowOjAgYW5hbHlzZT0weDM6MHgxMTMgbWU9aGV4IHN1Ym1lPTcgcHN5PTEgcHN5X3JkPTEuMDA6MC4wMCBtaXhlZF9yZWY9MSBtZV9yYW5nZT0xNiBjaHJvbWFfbWU9MSB0cmVsbGlzPTEgOHg4ZGN0PTEgY3FtPTAgZGVhZHpvbmU9MjEsMTEgZmFzdF9wc2tpcD0xIGNocm9tYV9xcF9vZmZzZXQ9LTIgdGhyZWFkcz02IGxvb2thaGVhZF90aHJlYWRzPTEgc2xpY2VkX3RocmVhZHM9MCBucj0wIGRlY2ltYXRlPTEgaW50ZXJsYWNlZD0wIGJsdXJheV9jb21wYXQ9MCBjb25zdHJhaW5lZF9pbnRyYT0wIGJmcmFtZXM9MyBiX3B5cmFtaWQ9MiBiX2FkYXB0PTEgYl9iaWFzPTAgZGlyZWN0PTEgd2VpZ2h0Yj0xIG9wZW5fZ29wPTAgd2VpZ2h0cD0yIGtleWludD0yNTAga2V5aW50X21pbj0yMCBzY2VuZWN1dD00MCBpbnRyYV9yZWZyZXNoPTAgcmNfbG9va2FoZWFkPTQwIHJjPWNyZiBtYnRyZWU9MSBjcmY9MjMuMCBxY29tcD0wLjYwIHFwbWluPTAgcXBtYXg9NjkgcXBzdGVwPTQgaXBfcmF0aW89MS40MCBhcT0xOjEuMDAAgAAAAA9liIQAM//+9uy+BTYQFYgQAAE9kSIKiURDMFYQskg6SW9jUi6Qr4CgAHSbA6BwJgAAgI9gACARoMgUT//7kmQmgG31GeL7TJ/AAAIAAA0gAAAAR3YnsaGmTgAAAAAAABOwAAABIBMThB08aIILOgZJmX3jy/QMAAPoU49XZmZmLfISnx0w6H4AAPbq8H4eADjY7bvK1sX1XgB5BwX777QBO07yovA/yNACyoARVtBQto1lPpxtrVAABfcVb5rNQxNJAADyGcvrpgtBAAcXDH6z7jAAAArIZdqgVMEgABmJqY2CXhZP//8AUSAA8iSysSx5I+j39///9PT79tqo7////6QAN/kh6SHLN6AAAAE0jXjG/j4QKTG+Ps6zAQAAEr/t5N/ztAAAAbX/Y8odQAAA8j77a82fQAAAARPaB64LAAAAC0fXv4QSAAAEpfME0QtAAAAB3Q9mWpI1CXkAAAzLeflhfcAAAANUYxGEmGAAAAGAspEg0oGkkLAAAKu1nz0XhAAAAhB8wOLotEAAACO0OMIrUAAAABbezJcBAAA=" type="video/mp4">';
+            document.body.appendChild(sleepVideo);
+
+            sleepVideo.play().catch(e => {
+              ytrLog('Error playing sleep prevention video', e);
+              preventSleepText.innerHTML = "Sleep prevention unavailable";
+            });
+          }
+
         } catch (err) {
           ytrLog('Wake Lock error', err);
+          preventSleepText.innerHTML = "Sleep prevention failed";
+          target.checked = false;
         }
       } else {
+        // Toggle off - release wake lock
         target.parentElement.querySelector('span').classList.replace('translate-x-0', 'translate-x-5');
         target.parentElement.querySelector('span').style.background = "#af3939";
+
         if (wakeLock) {
           wakeLock.release().then(() => {
             wakeLock = null;
-            preventSleepText.innerHTML = "Enabled Mobile Sleep";
+            preventSleepText.innerHTML = "Mobile Sleep Enabled";
           });
+        }
+
+        // Remove fallback video if it exists
+        const sleepVideo = document.getElementById('sleepPrevention');
+        if (sleepVideo) {
+          sleepVideo.pause();
+          sleepVideo.remove();
         }
       }
     });
@@ -439,17 +494,32 @@ const writeToLocalStorage = (data) => {
 
 const monitorDeviceSleep = () => {
   const currentTime = Date.now();
-  if ((currentTime - lastSync) > 10000) { // Device was asleep for more than 10 seconds
-    ytrLog("Device woke up from sleep, attempting to reconnect...");
+  const timeDiff = currentTime - lastSync;
+
+  if (timeDiff > 10000) { // Device was asleep for more than 10 seconds
+    ytrLog(`Device woke up after ${Math.round(timeDiff / 1000)}s, reconnecting...`);
+
+    // Close existing connection if any
     if (conn) {
-      conn.close();
+      try {
+        conn.close();
+      } catch (e) {
+        ytrLog("Error closing connection", e);
+      }
       conn = null;
     }
-    setupPeerJSPeer(); // Reinitialize PeerJS
-    if (idInputElement.value.length == 6) {
-      connectToYTServer(); // Reconnect to the server
-    }
+
+    // Re-initialize PeerJS with a delay to ensure proper cleanup
+    setTimeout(() => {
+      setupPeerJSPeer();
+
+      // Reconnect to the server if ID is valid
+      if (idInputElement.value.length == 6) {
+        setTimeout(() => connectToYTServer(), 1000);
+      }
+    }, 1000);
   }
+
   lastSync = currentTime;
 };
 
@@ -674,10 +744,9 @@ document.addEventListener("DOMContentLoaded", () => {
             clearInterval(peerJSSanityCheck);
 
             if (isMobileDevice()) {
-              ytrLog("Started mobile sleep catch");
-              // Check every 5 seconds
-              sleepMenu.style.display = "";
-              setInterval(monitorDeviceSleep, 5000);
+              ytrLog("Started mobile sleep detection");
+              sleepMenu.style.display = ""; // Show sleep prevention controls
+              setInterval(monitorDeviceSleep, 3000); // Check 3 sec
             }
           }
         }, 1000);
